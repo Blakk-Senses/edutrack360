@@ -1,0 +1,92 @@
+<div class="tab-pane fade show active" id="pills-add-school" role="tabpanel" aria-labelledby="pills-add-school-tab">
+    <form method="POST" action="{% url 'cis:add_school' %}" id="addSchoolForm">
+        {% csrf_token %}
+        
+        <h5 class="mt-4">School Details</h5>
+        <div class="mb-3">
+            <label for="schoolName" class="form-label">School Name</label>
+            <input type="text" id="schoolName" name="name" class="form-control" placeholder="Enter School Name" required>
+            {% if add_school_form.name.errors %}
+                <div class="error-message">{{ add_school_form.name.errors }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="schoolCode" class="form-label">School Code</label>
+            <input type="text" id="schoolCode" name="school_code" class="form-control" placeholder="Enter School Code" required>
+            {% if add_school_form.school_code.errors %}
+                <div class="error-message">{{ add_school_form.school_code.errors }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="district" class="form-label">District</label>
+            <input type="text" id="district" name="district" class="form-control" value="{{ user.assigned_district.name }}" readonly>
+            <input type="hidden" name="district_id" value="{{ user.assigned_district.id }}">
+        </div>
+        <div class="mb-3">
+            <label for="circuit" class="form-label">Circuit</label>
+            <select id="circuit" name="circuit" class="form-select" required>
+                <option value="">Select Circuit</option>
+                <!-- Dynamically populated options -->
+            </select>
+            {% if add_school_form.circuit.errors %}
+                <div class="error-message">{{ add_school_form.circuit.errors }}</div>
+            {% endif %}
+        </div>
+
+        <h5 class="mt-4">Headteacher Details</h5>
+        <div class="mb-3">
+            <label for="headteacherStaffID" class="form-label">Staff ID</label>
+            <input type="text" id="headteacherStaffID" name="headteacher_staff_id" class="form-control" placeholder="Enter Headteacher's Staff ID" required>
+            {% if add_school_form.headteacher_staff_id.errors %}
+                <div class="error-message">{{ add_school_form.headteacher_staff_id.errors }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="headteacherFirstName" class="form-label">First Name</label>
+            <input type="text" id="headteacherFirstName" name="headteacher_first_name" class="form-control" placeholder="Enter Headteacher's First Name" required>
+            {% if add_school_form.headteacher_first_name.errors %}
+                <div class="error-message">{{ add_school_form.headteacher_first_name.errors }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="headteacherLastName" class="form-label">Last Name</label>
+            <input type="text" id="headteacherLastName" name="headteacher_last_name" class="form-control" placeholder="Enter Headteacher's Last Name" required>
+            {% if add_school_form.headteacher_last_name.errors %}
+                <div class="error-message">{{ add_school_form.headteacher_last_name.errors }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="headteacherLicenseNumber" class="form-label">License Number</label>
+            <input type="text" id="headteacherLicenseNumber" name="headteacher_license_number" class="form-control" placeholder="Enter Headteacher's License Number" required>
+            {% if add_school_form.headteacher_license_number.errors %}
+                <div class="error-message">{{ add_school_form.headteacher_license_number.errors }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="headteacherEmail" class="form-label">Email Address</label>
+            <input type="email" id="headteacherEmail" name="headteacher_email" class="form-control" placeholder="Enter Headteacher's Email" required>
+            {% if add_school_form.headteacher_email.errors %}
+                <div class="error-message">{{ add_school_form.headteacher_email.errors }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="headteacherPhoneNumber" class="form-label">Phone Number</label>
+            <input type="text" id="headteacherPhoneNumber" name="headteacher_phone_number" class="form-control" placeholder="Enter Headteacher's Phone Number" required>
+            {% if add_school_form.headteacher_phone_number.errors %}
+                <div class="error-message">{{ add_school_form.headteacher_phone_number.errors }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="headteacherPassword" class="form-label">Password</label>
+            <input type="password" id="headteacherPassword" name="headteacher_password" class="form-control" placeholder="Enter Headteacher's Password" required>
+            {% if add_school_form.headteacher_password.errors %}
+                <div class="error-message">{{ add_school_form.headteacher_password.errors }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Hidden field for Role -->
+        <input type="hidden" name="role" value="headteacher">
+
+        <button type="submit" id="submit-button" class="btn btn-success">Add School</button>
+    </form>
+</div>

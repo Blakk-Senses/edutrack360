@@ -1,0 +1,254 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subject Teacher Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{% static 'css/subject_teacher_dashboard.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="navbar">
+        <div class="logo">
+            <a href="{% url 'dashboards:subject_teacher_dashboard' %}" class="href">
+            <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
+            </a>
+        </div>
+        <div class="navbar-icons">
+            <i class="fas fa-bell"></i>
+            <i class="fas fa-user-circle"></i>
+            <span class="welcome-text">Welcome, {{ user.first_name }}</span>
+        </div>
+        </div>
+        
+    </div>
+    <div class="sidebar">
+        <a href="{% url 'dashboards:subject_teacher_dashboard' %}">
+            <i class="fas fa-tachometer-alt"></i>
+            <span class="tooltip">Dashboard</span>
+        </a>
+        <a href="{% url 'teacher:upload_results' %}">
+            <i class="fas fa-file-upload"></i>
+            <span class="tooltip">Upload Results</span>
+        </a>
+        <a href="{% url 'teacher:subject_performance_analysis' %}">
+            <i class="fas fa-chart-bar"></i>
+            <span class="tooltip">Subject Performance Analysis</span>
+        </a>
+        <a href="{% url 'teacher:settings' %}">
+            <i class="fas fa-cog"></i>
+            <span class="tooltip">Settings</span>
+        </a>
+        <a href="{% url 'logout' %}" class="logout-link">
+            <i class="fas fa-sign-out-alt"></i>
+            <span class="tooltip">Logout</span>
+        </a>
+    </div>
+    <div class="main-content">
+        <div class="container mt-4">
+            <!-- Filters Row -->
+            <div class="row g-3 mb-4 align-items-end">
+                <div class="col-md-3">
+                    <label for="subjectFilter" class="form-label">Subject</label>
+                    <select id="subjectFilter" class="form-control">
+                        <option value="">All Subjects</option>
+                        {% for subject in assigned_subjects %}
+                            <option value="{{ subject.id }}" {% if subject.id|stringformat:"s" == selected_subject %}selected{% endif %}>
+                                {{ subject.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+    
+                <div class="col-md-3">
+                    <label for="classFilter" class="form-label">Class</label>
+                    <select id="classFilter" class="form-control">
+                        <option value="">All Classes</option>
+                        {% for class in assigned_classes %}
+                            <option value="{{ class.id }}" {% if class.id|stringformat:"s" == selected_class %}selected{% endif %}>
+                                {{ class.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+    
+                <div class="col-md-3">
+                    <label for="yearFilter" class="form-label">Academic Year</label>
+                    <select id="yearFilter" class="form-control">
+                        {% for year in academic_years %}
+                            <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>
+                                {{ year }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+    
+                <div class="col-md-3">
+                    <label for="termFilter" class="form-label">Term</label>
+                    <select id="termFilter" class="form-control">
+                        {% for t in terms %}
+                            <option value="{{ t }}" {% if t == selected_term %}selected{% endif %}>
+                                {{ t }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+    
+            <!-- Dashboard Cards -->
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="dashboard-card total-students-assessed">
+                        <div>
+                            <h3>Total Students Assessed</h3>
+                            <p class="value">0</p>
+                        </div>
+                        <div class="icon"><i class="fas fa-users"></i></div>
+                    </div>
+                </div>
+    
+                <div class="col-md-6">
+                    <div class="dashboard-card average-class-performance">
+                        <div>
+                            <h3>Average Class Performance (%)</h3>
+                            <p class="value">0%</p>
+                        </div>
+                        <div class="icon"><i class="fas fa-chart-line"></i></div>
+                    </div>
+                </div>
+    
+                <div class="col-md-6">
+                    <div class="dashboard-card best-performing-students">
+                        <div>
+                            <h3>Best Performing Students</h3>
+                            <ul class="value"></ul>
+                        </div>
+                        <div class="icon"><i class="fas fa-trophy"></i></div>
+                    </div>
+                </div>
+    
+                <div class="col-md-6">
+                    <div class="dashboard-card weakest-performing-students">
+                        <div>
+                            <h3>Weakest Performing Students</h3>
+                            <ul class="value"></ul>
+                        </div>
+                        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    </div>
+                </div>
+    
+                <!-- Subject Performance Trends Chart -->
+                <div class="col-md-12">
+                    <div class="custom-card">
+                        <div class="card-header">Subject Performance Trends</div>
+                        <div class="card-body">
+                            <canvas id="performanceTrendsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+    
+                <!-- Upcoming Deadlines & Reminders -->
+                <div class="col-md-12">
+                    <div class="custom-card">
+                        <div class="card-header">Upcoming Deadlines & Reminders</div>
+                        <div class="card-body">
+                            <p>No upcoming deadlines.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- jQuery and Chart.js -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- AJAX Script and Chart Rendering -->
+    <script>
+        function fetchDashboardData() {
+            let subject_id = $("#subjectFilter").val();
+            let class_id = $("#classFilter").val();
+            let academic_year = $("#yearFilter").val();
+            let term = $("#termFilter").val();
+    
+            $.ajax({
+                url: "{% url 'dashboards:subject_teacher_dashboard' %}",
+                type: "GET",
+                data: { subject_id, class_id, academic_year, term },
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                success: function (data) {
+                    // Update dashboard cards
+                    $(".total-students-assessed .value").text(data.total_students_assessed);
+                    $(".average-class-performance .value").text(data.average_class_performance + "%");
+    
+                    let bestStudentsHtml = data.best_students.map(s => `<li>${s.name} - ${s.mark}%</li>`).join("");
+                    $(".best-performing-students .value").html(bestStudentsHtml || "<li>No data</li>");
+    
+                    let weakestStudentsHtml = data.weakest_students.map(s => `<li>${s.name} - ${s.mark}%</li>`).join("");
+                    $(".weakest-performing-students .value").html(weakestStudentsHtml || "<li>No data</li>");
+    
+                    // Update performance trends chart
+                    updatePerformanceTrendsChart(data.performance_trends);
+                },
+                error: function (xhr) {
+                    console.error("Error fetching dashboard data:", xhr);
+                }
+            });
+        }
+    
+        // Fetch data when filters change
+        $("#subjectFilter, #classFilter, #yearFilter, #termFilter").change(fetchDashboardData);
+    
+        // Load data initially
+        $(document).ready(fetchDashboardData);
+    
+        // Initialize Chart.js for performance trends
+        let ctx = document.getElementById("performanceTrendsChart").getContext("2d");
+        let trendsChart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: [],
+                datasets: [{
+                    label: "Average Mark",
+                    data: [],
+                    borderColor: "blue",
+                    backgroundColor: "rgba(0, 0, 255, 0.2)",
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: {
+                    duration: 0 // Disable animations
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    
+        // Function to update chart data without animation
+        function updatePerformanceTrendsChart(trendsData) {
+            let labels = trendsData.map(d => d.term);
+            let data = trendsData.map(d => d.avg_mark);
+    
+            trendsChart.data.labels = labels;
+            trendsChart.data.datasets[0].data = data;
+    
+            trendsChart.update('none'); // Instant update without animation
+        }
+    </script>
+    
+    
+    
+    
+
+</body>
+</html>

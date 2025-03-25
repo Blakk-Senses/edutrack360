@@ -1,0 +1,131 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Edutrack360</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Base styles for mobile */
+        :root {
+            --text-move-up: 0px; /* No move for mobile */
+            --form-move-down: 0px; /* No move for mobile */
+        }
+        .left-section img {
+            height: 3rem; /* Default size for mobile */
+            margin-bottom: 1rem; /* Adjust margin below logo */
+        }
+
+        /* Desktop & Tablet Tweaks */
+        @media (min-width: 768px) {
+            :root {
+                --text-move-up: -90px; /* Adjust text/logo positioning */
+                --form-move-down: 50px; /* Adjust login form positioning */
+            }
+            .left-section img {
+                height: 6rem; /* Increase logo size on desktop */
+                margin-bottom: 2rem; /* Adjust margin for desktop */
+            }
+            /* Ensure the text breaks properly on larger screens */
+            .login-text-container {
+                display: flex;
+                flex-direction: column; /* Stack the text vertically */
+                align-items: flex-start;
+                max-width: 100%; /* Ensure text doesn't overflow */
+                word-wrap: break-word; /* Allow words to break */
+            }
+
+            .login-text {
+                display: block; /* Ensure the text is block-level */
+                max-width: 50%; /* Allow it to break to new lines */
+                word-wrap: break-word; /* Break the words when necessary */
+                font-size: 4rem; /* Increase text size on desktop */
+            }
+
+            .left-section {
+                position: relative;
+                top: var(--text-move-up); /* Moves the logo & text up */
+                left: 130px; /* Moves the text and logo slightly to the right */
+            }
+
+            .login-form-container {
+                position: relative;
+                right: 60px;
+                top: var(--form-move-down); /* Moves the form down */
+            }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#004d40] to-[#00695c]">
+    
+
+    <div class="relative flex flex-col md:flex-row items-center justify-between w-full max-w-6xl p-6 md:p-8">
+        <!-- Left Section (Text & Logo) -->
+        <div class="w-full md:w-1/2 text-left text-white left-section">
+            <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack Logo" class="h-12 mb-4 md:mb-6">
+            <div class="login-text-container">
+                <h1 class="text-3xl font-bold login-text">Login into <br class="md:hidden">Your Dashboard</h1> <!-- Text will break on mobile due to <br> -->
+            </div>
+        </div>
+
+        <!-- Login Form -->
+        <div class="w-full md:w-1/2 flex justify-center mt-8 md:mt-0 login-form-container">
+            <div class="w-full max-w-sm p-6 bg-white rounded-xl shadow-lg">
+                <form action="#" method="POST" class="mt-4">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label for="staff_id" class="block text-sm font-medium text-gray-700">Staff ID</label>
+                        <input type="text" id="staff_id" name="staff_id" required
+                            class="w-full px-4 py-2 mt-1 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600">
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                        <input type="password" id="password" name="password" required
+                            class="w-full px-4 py-2 mt-1 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600">
+                    </div>
+
+                    <button type="submit"
+                        class="w-full px-4 py-2 text-white bg-teal-600 rounded-lg hover:bg-teal-700">Login</button>
+                </form>
+
+                <p class="mt-4 text-sm text-center text-gray-600">
+                    <a href="{% url 'password_reset' %}" class="text-teal-600 hover:underline">Forgotten Password?</a>
+                </p>
+            </div>
+        </div>
+    </div>
+    <!-- Error Modal -->
+    {% if error %}
+    <div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="errorModalLabel">Login Failed</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {{ error }}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Show Modal if Error Exists -->
+    {% if error %}
+    <script>
+        var errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+        errorModal.show();
+    </script>
+    {% endif %}
+
+</body>
+</html>

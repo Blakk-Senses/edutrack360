@@ -1,0 +1,278 @@
+  /* Hide the hamburger button */
+  #sidebarToggleTop {
+    display: none;
+}
+
+
+.sidebar {
+    background-color: #008080 !important; /* Example: Change to your preferred color */
+}
+/* Custom Sidebar Item Text Color */
+.sidebar .nav-item .nav-link {
+    color: #ffffff; /* White text color */
+}
+
+.sidebar .nav-item .nav-link:hover {
+    color: #eeab01 !important; /* Hover color (yellow) */
+}
+/* Change sidebar icon color */
+.sidebar .nav-link i {
+    color: #ffcc00 !important; /* Example: Yellow icons */
+}
+
+/* Change sidebar item borders */
+.sidebar .nav-item {
+    border-color: #ffcc00 !important; /* Example: Yellow border */
+}
+/* Header Layout */
+#header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap; /* Allow items to wrap if necessary */
+    gap: 10px; /* Space between elements */
+}
+/* Ensure items shrink proportionally */
+#header-container .header-item {
+    flex-shrink: 1;
+}
+/* For small screens (less than 576px), stack the input and button vertically */
+@media (max-width: 576px) {
+    .form-inline {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .form-control {
+        margin-bottom: 10px; /* Add space between input and button */
+    }
+}
+
+.form-control,
+.btn {
+    background-color: #008080;
+    height: 32px; /* Adjust the height of the button and input */
+    line-height: 34px; /* Adjust the line height */
+}
+
+.form-control {
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+}
+
+.btn {
+    height: 32px;
+    line-height: 34px;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    background-color: #008080 !important; /* Set the background color to teal */
+    border-color: teal !important; /* Ensure the border matches the background */
+    color: white !important; /* Adjust text/icon color for better contrast */
+}
+
+.btn:hover {
+    background-color: #004d40 !important; /* Darker teal for hover effect */
+    border-color: #004d40 !important;
+}
+
+        /* Default font size for larger screens */
+.custom-dashboard-title {
+    font-size: 1.75rem !important; /* Approx. 28px */
+    font-weight: bold;
+    white-space: nowrap; /* Prevent title from wrapping by default */
+    line-height: 1.2; /* Adjust line-height to prevent too much spacing */
+}
+
+/* Button Default Styles */
+.download-btn {
+    font-size: 1rem; /* Default font size */
+    padding: 6px 12px; /* Default padding */
+    max-width: 150px; /* Set max width for the button */
+}
+
+/* Flexbox container to align dashboard title and button */
+.dashboard-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap; /* Allow wrapping if the screen is too small */
+}
+
+/* Medium screens (768px and below) */
+@media (max-width: 768px) {
+    .custom-dashboard-title {
+        font-size: 1.5rem !important; /* Approx. 24px */
+        white-space: normal; /* Allow text to wrap on medium screens */
+    }
+
+    .download-btn {
+        font-size: 0.875rem; /* Slightly smaller font size */
+        padding: 5px 10px; /* Reduced padding */
+        max-width: 130px; /* Reduce max-width */
+    }
+}
+
+/* Small screens (576px and below) */
+@media (max-width: 576px) {
+    .custom-dashboard-title {
+        font-size: 1rem !important; /* Approx. 20px */
+    }
+
+    .download-btn {
+        font-size: 0.75rem; /* Smaller font size */
+        padding: 4px 8px; /* Smaller padding */
+        max-width: 100px; /* Further reduce max-width */
+    }
+}
+
+/* Extra small screens (max-width: 400px) */
+@media (max-width: 400px) {
+    .custom-dashboard-title {
+        font-size: 0.75rem !important; /* Approx. 16px */
+    }
+
+    /* Target download button explicitly for extra small screens */
+    .download-btn {
+        font-size: 0.5rem !important; /* Smaller font size */
+        padding: 2px 4px !important; /* Smallest padding */
+        max-width: 80px; /* Smallest width for button */
+    }
+}
+
+        /* Change the global font color */
+body, .text-gray-800, .text-primary, .text-success, .text-warning, .text-info {
+    color: #1e4435 !important; /* Set to your preferred color */
+}
+
+/* Change the text color within the card */
+.card-body, .card-body .text-xs, .card-body .h5 {
+    color: #333333; /* Set to your preferred color */
+}
+
+/* Change the left border color of the cards */
+.card.border-left-primary {
+    border-left: 5px solid #018230 !important; /* Light blue border */
+}
+.card.border-left-success {
+    border-left: 5px solid #008080 !important; /* Green border */
+}
+.card.border-left-info {
+    border-left: 5px solid #01351f !important; /* Blue border */
+}
+.card.border-left-warning {
+    border-left: 5px solid #6d9f01 !important; /* Orange border */
+}
+
+/* Ensure the card's icons and headings are easy to read */
+.card-body .text-xs {
+    color: #555555; /* Dark gray for better contrast */
+}
+/* Change card icon color */
+.card-body .fa {
+    color: #012515; /* Set your desired icon color here */
+}
+/* Change icon color for the Total Schools card */
+.card.border-left-primary .fa-school {
+    color: #018230 !important; /* Example color */
+}
+
+/* Change icon color for the Total Teachers card */
+.card.border-left-success .fa-user-graduate {
+    color: #013b03 !important; /* Example color */
+}
+
+/* Change icon color for the Average District Performance card */
+.card.border-left-info .fa-chart-line {
+    color: #01351f !important; /* Example color */
+}
+
+/* Change icon color for the Active SISO Tasks card */
+.card.border-left-warning .fa-tasks {
+    color: #6d9f01 !important; /* Example color */
+}
+
+/* Specific color for Performance Trends */
+.card-header.trends {
+    background-color: #d4f3e7;
+    font-weight: bold !important;
+    color: #008080;  /* Ensure text color stays white */
+}
+
+/* Specific color for School Comparisons */
+.card-header.schools {
+    background-color: #d4f3e7;
+    font-weight: bold !important;
+    color: #008080;
+}
+
+/* Specific color for District Summary */
+.card-header.summary {
+    background-color: #d4f3e7;
+    font-weight: bold !important;
+    color: #008080;
+}
+
+/* Specific color for Active SISOs */
+.card-header.sisos {
+    background-color: #d4f3e7;
+    font-weight: bold !important;
+    color: #008080;
+}
+/* Notification Icon Customization */
+.notification-icon i {
+    color: #f3701a; /* Example: Bright orange */
+    font-size: 1.4rem;
+}
+.notification-icon i:hover {
+    color: #c85102; /* Darker shade on hover */
+}
+
+/* Profile Icon Customization */
+.profile-icon i {
+    color: #008080; /* Example: Blue */
+    font-size: 1.7rem;
+}
+.profile-icon i:hover {
+    color: #014e4e; /* Darker shade on hover */
+}
+
+/* Ensure proper spacing */
+.navbar .nav-item {
+    margin-left: 10px;
+}
+
+/* Small Logo Styling for Small Screens */
+.sidebar-logo {
+    text-align: center;
+    padding: 10px 0;
+}
+
+/* Styles for Small Screens */
+.logo-small {
+    max-width: 60px; /* Adjust the size for small screens */
+    max-height: 30px; /* Adjust the height for small screens */
+}
+
+/* Styles for Larger Screens */
+.logo-large {
+    max-width: 150px; /* Adjust the size for larger screens */
+    max-height: 70px;  /* Adjust the height for larger screens */
+}
+
+/* Optional: Center the logo on both small and large screens */
+.sidebar-logo img {
+    display: block;
+    margin: 0 auto;
+}
+
+        /* Add space between the Profile Icon and Welcome text on larger screens */
+.profile-icon .fa-user-circle {
+    margin-right: 10px; /* Adjust the space between the icon and text */
+}
+
+/* Optionally, you can add a custom class to target the 'Welcome' text */
+.welcome-text {
+    margin-left: 5px; /* Add some margin if needed */
+}

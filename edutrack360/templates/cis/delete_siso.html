@@ -1,0 +1,64 @@
+<style>
+    #delete_siso_form {
+    width: 100%;
+    max-width: 700px;
+    margin: 20px auto;
+    padding: 20px;
+    background: linear-gradient(135deg, #f88765, #ed3049); /* Teal Gradient */
+    color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-sizing: border-box;
+}
+
+#delete_siso_form label {
+    font-weight: 600;
+    display: block;
+    margin-bottom: 8px;
+}
+
+#delete_siso_form select {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 8px;
+    background: white;
+    transition: all 0.3s ease-in-out;
+    box-sizing: border-box;
+}
+
+#delete_siso_form select:focus {
+    border-color: #c82333; /* Darker red when focused */
+    outline: none;
+}
+
+#delete_siso_form button {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    background-color: #d91d2f;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s ease-in-out;
+    margin-top: 15px;
+}
+
+#delete_siso_form button:hover {
+    background-color: #a50414; /* Darker red on hover */
+}
+
+</style>
+<form id="delete_siso_form" class="form" method="post">
+    {% csrf_token %}
+    <label for="existing-siso">Select SISO to Delete <span class="required">*</span></label>
+    <select id="existing-siso" name="siso_id">
+        <option value="">-- Select SISO --</option>
+        {% for siso in sisos %}
+            <option value="{{ siso.id }}">{{ siso.get_full_name }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Delete</button>
+</form>

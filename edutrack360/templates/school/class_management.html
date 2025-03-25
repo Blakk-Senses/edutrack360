@@ -1,0 +1,338 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Teachers</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            background-color: #e0f7fa;
+            padding-top: 50px; /* Ensures content doesn't overlap with navbar */
+        }
+
+        .navbar {
+            background-color: #003a3b;
+            color: white;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            padding: 10px 20px;
+        }
+
+        .logo-img {
+            max-width: 120px;
+            height: auto;
+        }
+
+        .container {
+            margin-left: 100px;
+            margin-top: 60px;
+            padding: 20px;
+        }
+
+        .nav-pills .nav-link.active {
+            color: white !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="logo">
+            <a href="{% url 'dashboards:headteacher_dashboard' %}" class="href">
+                <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
+            </a>
+        </div>
+    </div>
+
+    <main class="container mt-4">
+
+        <ul class="nav nav-pills justify-content-center mb-4" id="teacherTabs">
+            <li class="nav-item">
+                <a class="nav-link fw-bold text-success" id="addClass-tab" data-bs-toggle="pill" href="#addClass" role="tab">
+                    <i class="fas fa-plus-circle me-1"></i> Add Class to Department
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active fw-bold" id="assign-tab" data-bs-toggle="pill" href="#assign" role="tab">
+                    <i class="fas fa-user-check me-1"></i> Assign Teacher
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link fw-bold text-danger" id="remove-tab" data-bs-toggle="pill" href="#remove" role="tab">
+                    <i class="fas fa-user-times me-1"></i> Remove Teacher
+                </a>
+            </li>
+        </ul>
+        
+        <div class="tab-content">
+            <!-- Add Class to Department Tab -->
+            <div class="tab-pane fade p-4 shadow rounded bg-white" id="addClass" role="tabpanel">
+                <h4 class="text-success"><i class="fas fa-plus-circle me-2"></i> Add Class to a Department</h4>
+                <form id="addClassForm">
+                    <div class="mb-3">
+                        <label for="class-department" class="fw-semibold">Select Department:</label>
+                        <select class="form-control border-success" id="class-department" required></select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newClass" class="fw-semibold">Enter Class Name:</label>
+                        <input type="text" class="form-control border-success" id="newClass" placeholder="Enter class name" required>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="fas fa-plus me-1"></i> Add Class
+                    </button>
+                </form>
+            </div>
+            <!-- Assign Teacher Tab -->
+            <div class="tab-pane fade show active p-4 shadow rounded bg-white" id="assign" role="tabpanel">
+                <h4 class="text-primary"><i class="fas fa-user-check me-2"></i> Assign a Teacher to a Class</h4>
+                <form id="assignTeacherForm">
+                    <div class="mb-3">
+                        <label for="teacher" class="fw-semibold">Select Teacher:</label>
+                        <select class="form-control border-primary" id="teacher" required></select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="department" class="fw-semibold">Select Department:</label>
+                        <select class="form-control border-primary" id="department" required></select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="class" class="fw-semibold">Select Class:</label>
+                        <select class="form-control border-primary" id="class" required></select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-paper-plane me-1"></i> Assign Teacher
+                    </button>
+                </form>
+            </div>
+        
+            <!-- Remove Teacher Tab -->
+            <div class="tab-pane fade p-4 shadow rounded bg-white" id="remove" role="tabpanel">
+                <h4 class="text-danger"><i class="fas fa-user-times me-2"></i> Remove a Teacher from a Class</h4>
+                <form id="removeTeacherForm">
+                    <div class="mb-3">
+                        <label for="remove-teacher" class="fw-semibold">Select Teacher:</label>
+                        <select class="form-control border-danger" id="remove-teacher" required></select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="remove-class" class="fw-semibold">Select Class:</label>
+                        <select class="form-control border-danger" id="remove-class" required></select>
+                    </div>
+                    <button type="submit" class="btn btn-danger w-100">
+                        <i class="fas fa-trash me-1"></i> Remove Teacher
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+
+        <!-- Confirmation Modal -->
+        <div class="modal fade" id="confirmationModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Action Result</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body"></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            loadTeachers();
+            loadDepartments();
+            loadDepartmentsForClass(); // Load departments for the "Add Class" form
+    
+            document.getElementById("department").addEventListener("change", function () {
+                loadClasses(this.value);
+            });
+    
+            document.getElementById("assignTeacherForm").addEventListener("submit", function (event) {
+                event.preventDefault();
+                assignTeacher();
+            });
+    
+            document.getElementById("remove-teacher").addEventListener("change", function () {
+                loadTeacherClasses(this.value);
+            });
+    
+            document.getElementById("removeTeacherForm").addEventListener("submit", function (event) {
+                event.preventDefault();
+                removeTeacher();
+            });
+    
+            document.getElementById("addClassForm").addEventListener("submit", function (event) {
+                event.preventDefault();
+                addClassToDepartment();
+            });
+        });
+    
+        function loadTeachers() {
+            fetch("/school/get_teachers/")
+                .then(response => response.json())
+                .then(data => {
+                    let teacherSelect = document.getElementById("teacher");
+                    let removeTeacherSelect = document.getElementById("remove-teacher");
+                    teacherSelect.innerHTML = '<option value="">Select Teacher</option>';
+                    removeTeacherSelect.innerHTML = '<option value="">Select Teacher</option>';
+                    data.teachers.forEach(teacher => {
+                        let fullName = `${teacher["user__first_name"]} ${teacher["user__last_name"]}`;
+                        let option = `<option value="${teacher.id}">${fullName}</option>`;
+                        teacherSelect.innerHTML += option;
+                        removeTeacherSelect.innerHTML += option;
+                    });
+                })
+                .catch(error => console.error("Error loading teachers:", error));
+        }
+    
+        function loadDepartments() {
+            fetch("/school/get_departments/")
+                .then(response => response.json())
+                .then(data => {
+                    let departmentSelect = document.getElementById("department");
+                    departmentSelect.innerHTML = '<option value="">Select Department</option>';
+                    data.departments.forEach(dept => {
+                        departmentSelect.innerHTML += `<option value="${dept.id}">${dept.name}</option>`;
+                    });
+                })
+                .catch(error => console.error("Error loading departments:", error));
+        }
+    
+        function loadDepartmentsForClass() {
+            fetch("/school/get_departments/")
+                .then(response => response.json())
+                .then(data => {
+                    let departmentSelect = document.getElementById("class-department");
+                    departmentSelect.innerHTML = '<option value="">Select Department</option>';
+                    data.departments.forEach(dept => {
+                        departmentSelect.innerHTML += `<option value="${dept.id}">${dept.name}</option>`;
+                    });
+                })
+                .catch(error => console.error("Error loading departments:", error));
+        }
+    
+        function loadClasses(departmentId) {
+            if (!departmentId) return;
+            fetch(`/school/get_classes_by_department/?department_id=${departmentId}`)
+                .then(response => response.json())
+                .then(data => {
+                    let classSelect = document.getElementById("class");
+                    classSelect.innerHTML = '<option value="">Select Class</option>';
+                    data.classes.forEach(cls => {
+                        classSelect.innerHTML += `<option value="${cls.id}">${cls.name}</option>`;
+                    });
+                })
+                .catch(error => console.error("Error loading classes:", error));
+        }
+    
+        function loadTeacherClasses(teacherId) {
+            if (!teacherId) return;
+            fetch(`/school/get_teacher_classes/?teacher=${teacherId}`)
+                .then(response => response.json())
+                .then(data => {
+                    let classSelect = document.getElementById("remove-class");
+                    classSelect.innerHTML = '<option value="">Select Class</option>';
+                    data.classes.forEach(cls => {
+                        classSelect.innerHTML += `<option value="${cls['assigned_class__id']}">${cls['assigned_class__name']}</option>`;
+                    });
+
+                })
+                .catch(error => console.error("Error loading teacher classes:", error));
+        }
+
+    
+        function assignTeacher() {
+            let teacher = document.getElementById("teacher").value;
+            let department = document.getElementById("department").value;
+            let classId = document.getElementById("class").value;
+    
+            if (!teacher || !department || !classId) {
+                showModal("All fields are required.");
+                return;
+            }
+    
+            fetch("/school/assign_teacher_to_class/", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRFToken": getCSRFToken() },
+                body: `teacher=${teacher}&department=${department}&class=${classId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                showModal(data.message || data.error);
+                loadTeachers();
+            })
+            .catch(error => console.error("Error assigning teacher:", error));
+        }
+    
+        function removeTeacher() {
+            let teacher = document.getElementById("remove-teacher").value;
+            let classId = document.getElementById("remove-class").value;
+    
+            if (!teacher || !classId) {
+                showModal("All fields are required.");
+                return;
+            }
+    
+            fetch("/school/remove_teacher_from_class/", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRFToken": getCSRFToken() },
+                body: `remove-teacher=${teacher}&remove-class=${classId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                showModal(data.message || data.error);
+                loadTeachers();
+            })
+            .catch(error => console.error("Error removing teacher:", error));
+        }
+    
+        function addClassToDepartment() {
+            let department = document.getElementById("class-department").value;
+            let className = document.getElementById("newClass").value;
+    
+            if (!department || !className) {
+                showModal("Both department and class name are required.");
+                return;
+            }
+    
+            fetch("/school/add_class_to_department/", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRFToken": getCSRFToken() },
+                body: `department=${department}&class_name=${className}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                showModal(data.message || data.error);
+                document.getElementById("addClassForm").reset();
+                loadDepartmentsForClass(); // Refresh department list
+            })
+            .catch(error => console.error("Error adding class:", error));
+        }
+    
+        function showModal(message) {
+            document.querySelector("#confirmationModal .modal-body").innerHTML = message;
+            new bootstrap.Modal(document.getElementById("confirmationModal")).show();
+        }
+    
+        function getCSRFToken() {
+            return document.cookie.split('; ').find(row => row.startsWith('csrftoken=')).split('=')[1];
+        }
+    </script>
+    
+
+</body>
+</html>

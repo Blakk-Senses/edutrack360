@@ -1,0 +1,153 @@
+
+<body class="container py-4">
+
+    <h2 class="text-center mb-4">Subject Performance Analysis</h2>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label for="academicYear" class="form-label">Academic Year</label>
+            <select id="academicYear" class="form-select"></select>
+        </div>
+        <div class="col-md-3">
+            <label for="term" class="form-label">Term</label>
+            <select id="term" class="form-select"></select>
+        </div>
+        <div class="col-md-3">
+            <label for="subject" class="form-label">Subject</label>
+            <select id="subject" class="form-select"></select>
+        </div>
+        <div class="col-md-3">
+            <label for="classGroup" class="form-label">Class Group</label>
+            <select id="classGroup" class="form-select"></select>
+        </div>
+    </div>
+
+    <button class="btn btn-primary mb-3" onclick="fetchPerformance()">Load Performance</button>
+    <button class="btn btn-success mb-3" onclick="downloadCSV()">Download Data</button>
+
+    <!-- Term Performance Table -->
+    <h4>Term Performance</h4>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Subject</th>
+                <th>Selected Term</th>
+                <th>Previous Term 1</th>
+                <th>Previous Term 2</th>
+            </tr>
+        </thead>
+        <tbody id="termPerformanceTable"></tbody>
+    </table>
+
+    <!-- Yearly Performance Table -->
+    <h4>Yearly Performance</h4>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Subject</th>
+                <th>Selected Year</th>
+                <th>Previous Year 1</th>
+                <th>Previous Year 2</th>
+            </tr>
+        </thead>
+        <tbody id="yearlyPerformanceTable"></tbody>
+    </table>
+
+    <script>
+        async function loadFilters() {
+            try {
+                const response = await fetch("/teacher/available-terms/");
+                const data = await response.json();
+
+                populateDropdown("academicYear", data.academic_years, data.selected_academic_year);
+                populateDropdown("term", data.terms);
+            } catch (error) {
+                console.error("Error fetching available terms:", error);
+            }
+        }
+
+        function populateDropdown(id, options, selected = null) {
+            const dropdown = document.getElementById(id);
+            dropdown.innerHTML = options.map(opt => 
+                `<option value="${opt.name}" ${opt.name === selected ? "selected" : ""}>${opt.name}</option>`
+            ).join("");
+        }
+
+        async function fetchPerformance() {
+            const academicYear = document.getElementById("academicYear").value;
+            const term = document.getElementById("term").value;
+            const subject = document.getElementById("subject").value;
+            const classGroup = document.getElementById("classGroup").value;
+
+            const baseYear = parseInt(academicYear.split("/")[0]);
+            const previousYears = [`${baseYear - 1}/${baseYear}`, `${baseYear - 2}/${baseYear - 1}`];
+
+            const termMapping = {
+                "Term 1": ["Term 2", "Term 3"],
+                "Term 2": ["Term 3", "Term 1"],
+                "Term 3": ["Term 1", "Term 2"]
+            };
+            const previousTerms = termMapping[term] || [];
+
+            const url = `/teacher/subject-performance-analysis/?academic_year=${academicYear}&term=${term}&subject=${subject}&class_group=${classGroup}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                populateTable("termPerformanceTable", data.term_performance, ["selected_term", "previous_terms"], previousTerms);
+                populateTable("yearlyPerformanceTable", data.academic_performance, ["selected_year", "previous_years"], previousYears);
+            } catch (error) {
+                console.error("Error fetching performance data:", error);
+            }
+        }
+
+        function populateTable(tableId, data, keys, dynamicColumns) {
+            const tableBody = document.getElementById(tableId);
+            tableBody.innerHTML = "";
+
+            Object.entries(data).forEach(([subject, performance]) => {
+                let row = `<tr><td>${subject}</td>`;
+                
+                keys.forEach(key => {
+                    if (typeof performance[key] === "object") {
+                        const values = dynamicColumns.map(col => performance[key][col] || "-");
+                        row += `<td>${values.join("</td><td>")}</td>`;
+                    } else {
+                        row += `<td>${performance[key] || "-"}</td>`;
+                    }
+                });
+
+                row += `</tr>`;
+                tableBody.insertAdjacentHTML("beforeend", row);
+            });
+        }
+
+        function downloadCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            let termTable = document.querySelectorAll("#termPerformanceTable tr");
+            let yearlyTable = document.querySelectorAll("#yearlyPerformanceTable tr");
+
+            csvContent += "Term Performance\nSubject,Selected Term,Previous Term 1,Previous Term 2\n";
+            termTable.forEach(row => {
+                csvContent += Array.from(row.children).map(td => td.textContent).join(",") + "\n";
+            });
+
+            csvContent += "\nYearly Performance\nSubject,Selected Year,Previous Year 1,Previous Year 2\n";
+            yearlyTable.forEach(row => {
+                csvContent += Array.from(row.children).map(td => td.textContent).join(",") + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "performance_data.csv");
+            document.body.appendChild(link);
+            link.click();
+        }
+
+        window.onload = loadFilters;
+    </script>
+
+</body>
+</html>

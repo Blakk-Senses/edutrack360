@@ -1,0 +1,72 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Edutrack360</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* 🌟 Modern Gradient Background */
+      .main-bg {
+          background: linear-gradient(to right, #134e5e, #71b280);
+          height: 100vh;
+      }
+
+      /* 📌 Sidebar */
+      .sidebar {
+          width: 14%;
+          background-color: #e0f7fa; /* Teal with transparency */
+          height: 100vh;
+      }
+
+      /* 🔥 Modern Login Button */
+      .modern-btn {
+          margin-top: 20px;
+          padding: 14px 32px;
+          font-size: 18px;
+          font-weight: bold;
+          color: white;
+          background: linear-gradient(135deg, #1abc9c, #16a085);
+          border-radius: 8px;
+          box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+          transition: all 0.3s ease-in-out;
+          text-decoration: none;
+      }
+
+      .modern-btn:hover {
+          background: linear-gradient(135deg, #16a085, #1abc9c);
+          box-shadow: 0px 6px 14px rgba(0, 0, 0, 0.3);
+          transform: translateY(-2px);
+      }
+
+      /* 📱 Responsive Sidebar Adjustments */
+      @media (max-width: 1024px) {
+          .sidebar { width: 12%; }
+      }
+
+      @media (max-width: 768px) {
+          .sidebar { width: 10%; }
+      }
+
+      @media (max-width: 480px) {
+          .sidebar { display: none; }
+      }
+
+    </style>
+</head>
+<body class="main-bg flex">
+  <!-- Sidebar -->
+  <div class="sidebar"></div>
+  
+  <!-- Main Content -->
+  <div class="flex flex-col justify-center items-center flex-1 text-center px-4 relative">
+      <!-- Logo at the top left -->
+      <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="absolute top-6 left-6 w-32">
+
+      <h1 class="text-5xl font-bold mt-16 text-white">👋 Welcome!</h1>
+      <p class="text-lg text-gray-200 mt-2">A comprehensive Tool for Tacking Academic Performance and Progress</p>
+      <a href="{% url 'login' %}" class="modern-btn">Login</a>
+  </div>
+</body>
+</html>

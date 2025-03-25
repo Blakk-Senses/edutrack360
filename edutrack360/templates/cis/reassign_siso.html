@@ -1,0 +1,92 @@
+<style>    
+
+    /* Label Styling */
+    .form label {
+        font-size: 16px;
+        font-weight: bold;
+        display: block;
+        margin: 10px 0 5px;
+        color: #ffffff; /* Dark Teal Text */
+    }
+
+
+    /* Input Focus Effect */
+    .form input:focus,
+    .form select:focus {
+        outline: none;
+        border-color: #0f766e;
+        box-shadow: 0 0 8px rgba(32, 201, 151, 0.4);
+    }
+
+    /* Required Asterisk */
+    .required {
+        color: #ff4d4d;
+    }
+
+    /* Button Styling */
+    .form button {
+        width: 100%;
+        padding: 12px;
+        font-size: 18px;
+        font-weight: bold;
+        background: linear-gradient(135deg, #198754, #0f5132); /* Dark Teal Button */
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease-in-out;
+    }
+
+    /* Button Hover Effect */
+    .form button:hover {
+        background: linear-gradient(135deg, #0f5132, #0d3b2a);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+    .form {
+        width: 100%;
+        max-width: 700px;
+        margin: 20px auto;
+        padding: 20px;
+        background: linear-gradient(135deg, #20c997, #0f766e); /* Teal Gradient */
+
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        box-sizing: border-box;
+    }
+
+    .form input,
+    .form select {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        border-radius: 8px;
+        background: white;
+        transition: all 0.3s ease-in-out;
+        box-sizing: border-box;
+    }
+
+    .container { /* If your form is inside a container */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+</style>
+<form id="reassign_siso_form" class="form" method="post">
+    {% csrf_token %}
+    <label for="existing-siso">Select Existing SISO <span class="required">*</span></label>
+    <select id="existing-siso" name="siso">
+        <option value="">-- Select SISO --</option>
+        {% for siso in all_sisos %}
+            <option value="{{ siso.id }}">{{ siso.get_full_name }}</option>
+        {% endfor %}
+    </select>
+    <label for="new-circuit">Select New Circuit <span class="required">*</span></label>
+    <select id="new-circuit" name="circuit">
+        <option value="">-- Select Circuit --</option>
+        {% for circuit in circuits %}
+            <option value="{{ circuit.id }}">{{ circuit.name }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Reassign</button>
+</form>

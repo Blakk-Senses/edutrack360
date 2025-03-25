@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: "Arial", sans-serif; font-size: 12px; }
+        h3, h5 { margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .center { text-align: center; }
+    </style>
+</head>
+<body>
+
+    <h3>Subject Performance Analysis - {{ selected_subject }}</h3>
+    <p><strong>Academic Year:</strong> {{ selected_year }} &nbsp; | &nbsp;
+       <strong>Term:</strong> {{ selected_term }} &nbsp; | &nbsp;
+       <strong>Class:</strong> {{ selected_class }}</p>
+
+    <h5>Student Performance</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Student Name</th>
+                <th>{{ selected_subject }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in student_rows %}
+                <tr>
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.mark }}</td>
+                </tr>
+            {% endfor %}
+            {% if class_average_row %}
+                <tr>
+                    <td><strong>{{ class_average_row.name }}</strong></td>
+                    <td><strong>{{ class_average_row.mark }}</strong></td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <h5>Termly Performance Trend</h5>
+    <table>
+        <thead>
+            <tr>
+                {% for key in term_trend.keys %}
+                    <th>{{ key }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                {% for val in term_trend.values %}
+                    <td>{{ val }}</td>
+                {% endfor %}
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Yearly Performance Trend</h5>
+    <table>
+        <thead>
+            <tr>
+                {% for key in academic_trend.keys %}
+                    <th>{{ key }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                {% for val in academic_trend.values %}
+                    <td>{{ val }}</td>
+                {% endfor %}
+            </tr>
+        </tbody>
+    </table>
+
+</body>
+</html>

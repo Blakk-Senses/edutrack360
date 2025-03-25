@@ -1,0 +1,289 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Management</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            background-color: #e0f7fa;
+            padding-top: 80px; /* Ensures content doesn't overlap with navbar */
+        }
+
+        .navbar {
+            background-color: #003a3b;
+            color: white;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            padding: 10px 20px;
+        }
+
+        .logo-img {
+            max-width: 120px;
+            height: auto;
+        }
+
+        .navbar-icons {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .btn-custom {
+            font-size: 16px;
+        }
+
+        .template-container {
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+        }
+
+        .btn-custom {
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 12px;
+            border: none;
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .alert {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(0);
+            z-index: 1000;
+            width: 50%;
+            text-align: center;
+            font-weight: bold;
+            opacity: 0;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .btn-custom:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #545b62);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #1e7e34);
+            color: white;
+        }
+
+        .text-center {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Fixed Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid d-flex justify-content-between">
+            <a href="{% url 'dashboards:headteacher_dashboard' %}">
+                <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
+            </a>
+    </nav>
+
+    <main class="container mt-4">
+        <div id="notification" class="alert d-none" role="alert"></div>
+
+        <div class="text-center mb-3">
+            <button id="manualUploadButton" class="btn btn-primary btn-custom">📄 Manual Upload</button>
+            <button id="bulkUploadButton" class="btn btn-secondary btn-custom">📂 Bulk Upload</button>
+            <button id="downloadTemplateButton" class="btn btn-success btn-custom">⬇️ Download Template</button>
+        </div>
+        
+        <div id="templateContainer" class="template-container">
+            <!-- Dynamic Templates will be loaded here -->
+        </div>
+    </main>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            attachButtonListeners();
+        });
+
+        // Get CSRF token from the form or cookies
+        function getCSRFToken() {
+            let token = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+            if (!token) {
+                token = document.cookie
+                    .split('; ')
+                    .find(row => row.startsWith('csrftoken='))?.split('=')[1] || '';
+            }
+            return token;
+        }
+
+        // Show notification with auto-hide
+        function showNotification(message, type = "info") {
+            const notification = document.getElementById("notification");
+            if (!notification) return;
+
+            notification.textContent = message;
+            notification.className = `alert alert-${type} fade show`;
+            notification.style.opacity = "1";
+            notification.style.transform = "translateX(-50%) translateY(0)";
+            notification.classList.remove("d-none");
+
+            setTimeout(() => {
+                notification.style.opacity = "0";
+                notification.style.transform = "translateX(-50%) translateY(-10px)";
+                setTimeout(() => notification.classList.add("d-none"), 300);
+            }, 5000);
+        }
+
+        // Load manual upload form dynamically
+        function loadManualUploadForm() {
+            const container = document.getElementById("templateContainer");
+            if (!container) return;
+
+            container.innerHTML = `
+                <h2 class="text-center">Manual Upload</h2>
+                <form id="manualUploadForm" action="/school/manual_upload/" method="POST" class="p-3 border rounded">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="${getCSRFToken()}">
+                    <input type="hidden" name="role" value="teacher">  
+                    <div class="mb-3"><label class="form-label">Staff ID:</label><input type="text" class="form-control" name="staff_id" required></div>
+                    <div class="mb-3"><label class="form-label">License Number:</label><input type="text" class="form-control" name="license_number" required></div>
+                    <div class="mb-3"><label class="form-label">First Name:</label><input type="text" class="form-control" name="first_name" required></div>
+                    <div class="mb-3"><label class="form-label">Last Name:</label><input type="text" class="form-control" name="last_name" required></div>
+                    <div class="mb-3"><label class="form-label">Email:</label><input type="email" class="form-control" name="email" required></div>
+                    <div class="mb-3"><label class="form-label">Phone Number:</label><input type="text" class="form-control" name="phone_number" required></div>
+                    <div class="mb-3"><label class="form-label">Password:</label><input type="password" class="form-control" name="password1" required></div>
+                    <div class="mb-3"><label class="form-label">Confirm Password:</label><input type="password" class="form-control" name="password2" required></div>
+                    <button type="submit" class="btn btn-success w-100">Upload</button>
+                </form>
+            `;
+
+            attachManualUploadFormListener();
+        }
+
+        // Attach event listener for manual upload form
+        function attachManualUploadFormListener() {
+            document.getElementById("manualUploadForm")?.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                await handleFormSubmit(this, "Manual Upload successful! The user is assigned as a teacher.", "Manual Upload failed.");
+            });
+        }
+
+        // Load bulk upload form dynamically
+        function loadBulkUploadForm() {
+            document.getElementById("templateContainer").innerHTML = `
+                <h2 class="text-center">Bulk Upload</h2>
+                <form id="bulkUploadForm" action="/school/bulk_upload_teachers/" method="POST" enctype="multipart/form-data" class="p-3 border rounded">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="${getCSRFToken()}">
+                    <div class="mb-3"><label class="form-label">Upload CSV File:</label><input type="file" class="form-control" name="file" accept=".csv,.xls,.xlsx" required></div>
+                    <button type="submit" class="btn btn-success w-100">Upload</button>
+                </form>
+            `;
+
+            attachBulkUploadFormListener();
+        }
+
+        // Attach event listener for bulk upload form
+        function attachBulkUploadFormListener() {
+            document.getElementById("bulkUploadForm")?.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                await handleFormSubmit(this, "Bulk Upload successful! Teachers have been assigned.", "Bulk Upload failed.");
+            });
+        }
+
+        // Handle form submissions via AJAX
+        async function handleFormSubmit(form, successMessage, errorMessage) {
+            const formData = new FormData(form);
+            showNotification("Processing request...", "info");
+
+            try {
+                const response = await fetch(form.action, {
+                    method: "POST",
+                    body: formData,
+                    credentials: "same-origin",
+                    headers: {
+                        "X-CSRFToken": getCSRFToken(),
+                    },
+                });
+
+                const result = await response.json();
+                console.log("Server Response:", result); // Debugging
+
+                if (response.ok) {
+                    showNotification(successMessage, "success");
+                    form.reset();
+                } else {
+                    let errorMsg = result.errors ? Object.values(result.errors).join(', ') : errorMessage;
+                    showNotification(errorMsg, "danger");
+                }
+            } catch (error) {
+                console.error("Error:", error); // Debugging
+                showNotification("An error occurred. Please try again.", "danger");
+            }
+        }
+
+        // Attach button event listeners
+        function attachButtonListeners() {
+            document.getElementById("manualUploadButton")?.addEventListener("click", () => loadManualUploadForm());
+            document.getElementById("bulkUploadButton")?.addEventListener("click", () => loadBulkUploadForm());
+            document.getElementById("downloadTemplateButton")?.addEventListener("click", () => loadDownloadTemplate());
+        }
+
+        // Load download template options
+        function loadDownloadTemplate() {
+            document.getElementById("templateContainer").innerHTML = `
+                <h2 class="text-center">Download Template</h2>
+                <p class="text-center">Click below to download the template:</p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button class="btn btn-primary" onclick="downloadFile('/school/download_teacher_template/csv', 'bulk_teacher_upload_template.csv')">CSV Template</button>
+                    <button class="btn btn-success" onclick="downloadFile('/school/download_teacher_template/excel', 'bulk_teacher_upload_template.xlsx')">Excel Template</button>
+                </div>
+            `;
+        }
+
+        // Download file helper function
+        function downloadFile(url, filename) {
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+
+    </script>
+    
+</body>
+</html>

@@ -1,0 +1,356 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circuit Dashboard</title>
+    <link rel="stylesheet" href="{% static 'css/styles_cis.css' %}">
+    <link href="{% static 'vendor/fontawesome-free/css/all.min.css' %}" rel="stylesheet" type="text/css">
+    <link href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}" rel="stylesheet" type="text/css">
+    <link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet" type="text/css">
+
+</head>
+<body id="page-top">
+
+    <div id="wrapper">
+        <!-- Sidebar (Collapsible) -->
+        <ul class="navbar-nav sidebar sidebar-dark accordion" id="accordionSidebar">
+            <!-- EduTrack360 Logo (Visible on Small Screens Only) -->
+            <!-- EduTrack360 Logo (Visible on Small Screens Only) -->
+            <div class="sidebar-logo d-block d-md-none">
+                <img src="{% static 'edutrack logo.png' %}" alt="EduTrack360 Logo" class="img-fluid logo-small">
+            </div>
+
+            <!-- EduTrack360 Logo (Visible on Larger Screens Only) -->
+            <div class="sidebar-logo d-none d-md-block">
+                <img src="{% static 'edutrack logo.png' %}" alt="EduTrack360 Logo" class="img-fluid logo-large">
+            </div>
+
+            <!-- Hamburger Navbar (conditionally hidden on small screens) -->
+            <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                <i class="fa fa-bars"></i>
+            </button>
+
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'siso:circuit_overview' %}">
+                    <i class="fas fa-school"></i>
+                    <span>Circuit Overview</span>
+                </a>
+                
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'siso:siso_generate_reports' %}">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Generate Reports</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'siso:siso_send_notifications' %}">
+                    <i class="fas fa-bell"></i>
+                    <span>Send Notifications</span>
+                </a>
+            </li>
+
+            <!-- Sidebar Toggler -->
+            <hr class="sidebar-divider my-0">
+        </ul>
+
+        <!-- Main Content -->
+        <div id="content-wrapper" class="d-flex flex-column">
+            <div id="content">
+                <!-- Topbar -->
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+                    <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                        <i class="fa fa-bars"></i>
+                    </button>
+
+                    <!-- Navbar Icon Buttons -->
+                    <ul class="navbar-nav ml-auto">
+                        <li class="nav-item">
+                            <li class="nav-item dropdown no-arrow mx-2">
+                                <a class="nav-link dropdown-toggle" href="#" id="notificationDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="fas fa-bell notification-icon"></i>
+                                    <span class="badge badge-danger" id="notification-count">0</span>
+                                </a>
+                                <!-- Notifications Dropdown Menu -->
+                                <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in" aria-labelledby="notificationDropdown">
+                                    <h6 class="dropdown-header">Notifications</h6>
+                                    <div id="notifications-list">
+                                        <p class="dropdown-item text-muted">No new notifications</p>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="nav-item dropdown no-arrow">
+                                <!-- Profile Icon with Dropdown -->
+                                <a class="nav-link dropdown-toggle profile-icon" href="#" id="userDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <!-- Profile Icon Replaces Text on Small Screens -->
+                                    <i class="fas fa-user-circle"></i>
+                                    <span class="mr-2 d-none d-lg-inline text-gray-600 small welcome-text">Welcome, SISO {{ user.first_name }}</span>
+                                </a>
+                                <!-- Dropdown Menu -->
+                                <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in" aria-labelledby="userDropdown">
+                                    <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
+                                        <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i> Logout
+                                    </a>
+                                </div>
+                            </li>                            
+                        </li>
+                    </ul>
+                </nav>
+
+                <!-- Page Content -->
+                <div class="container-fluid">
+                    <!-- Page Heading -->
+                    <div class="dashboard-container mb-4">
+                        <h1 class="h3 mb-0 text-gray-800 custom-dashboard-title">{{ user.circuit }} Circuit Dashboard</h1>
+                        <a href="{% url 'siso:download_circuit_report' circuit_id=user.circuit.id %}"
+                        class="btn btn-primary btn-sm shadow-sm download-btn">
+                            <i class="fas fa-download fa-sm text-white-50"></i> Download Report
+                        </a>
+                    </div>
+                    
+                    <!-- Content Row for Cards -->
+                    <div class="row">
+                        <!-- Total Schools Card -->
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card border-left-primary shadow h-100 py-2">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                                Total Schools in Circuit
+                                            </div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                                {{ total_schools|default:"0" }}
+                                            </div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-school fa-2x text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total Teachers Card -->
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card border-left-success shadow h-100 py-2">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                                Total Teachers in Circuit
+                                            </div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                                {{ total_teachers|default:"0" }}
+                                            </div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-user-graduate fa-2x text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Average District Performance Card -->
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card border-left-info shadow h-100 py-2">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                                Average Circuit Performance
+                                            </div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                                {{ avg_district_performance|default:"0%" }}
+                                            </div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active SISO Tasks Card -->
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card border-left-warning shadow h-100 py-2">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                                Active Headteacher Tasks
+                                            </div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                                {{ active_siso_tasks|default:"0" }}
+                                            </div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-tasks fa-2x text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Performance Trends Chart -->
+                    <div class="col-xl-8 col-lg-7">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3 trends">
+                                <h6 class="m-0 font-weight-bold">Circuit Performance Trends</h6>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="performanceTrendsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- School Comparisons -->
+                    <div class="col-xl-4 col-lg-5">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3 schools">
+                                <h6 class="m-0 font-weight-bold">Top Performing Schools</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-group">
+                                    {% for school in top_schools %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ school.name }}
+                                        <span class="badge badge-primary badge-pill">{{ school.performance_score }}%</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- District Summary -->
+                    <div class="col-xl-12 col-lg-12">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3 summary">
+                                <h6 class="m-0 font-weight-bold">Circuit Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <p>{{ district_summary }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active SISOs -->
+                    <div class="col-xl-12 col-lg-12">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3 sisos">
+                                <h6 class="m-0 font-weight-bold">Active Headteachers</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-group">
+                                    {% for siso in active_sisos %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ siso.name }}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+
+
+<!-- Add Static JS Files -->
+<script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+<script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'vendor/jquery-easing/jquery.easing.min.js' %}"></script>
+<script src="{% static 'js/sb-admin-2.min.js' %}"></script>
+
+<!-- Chart.js Script -->
+<script src="{% static 'vendor/chart.js/Chart.min.js' %}"></script>
+<script>
+    // Get data safely
+    var performanceLabels = JSON.parse(document.getElementById('performance-labels').textContent);
+    var performanceData = JSON.parse(document.getElementById('performance-data').textContent);
+
+    // Setup the Performance Trends Chart
+    var ctx = document.getElementById("performanceTrendsChart").getContext("2d");
+    var performanceTrendsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: performanceLabels,
+            datasets: [{
+                label: 'Performance',
+                data: performanceData,
+                backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                borderColor: 'rgba(78, 115, 223, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    ticks: {
+                        color: "rgba(234, 236, 244, 1)"
+                    },
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    ticks: {
+                        color: "rgba(234, 236, 244, 1)"
+                    },
+                    grid: {
+                        color: "rgba(234, 236, 244, 1)"
+                    }
+                }
+            }
+        }
+    });
+</script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        function fetchNotifications() {
+            fetch("{% url 'cis:get_notifications' %}")  // Adjust with your actual URL
+                .then(response => response.json())
+                .then(data => {
+                    let notificationCount = document.getElementById("notification-count");
+                    let notificationList = document.getElementById("notifications-list");
+
+                    if (data.unread_count > 0) {
+                        notificationCount.textContent = data.unread_count;
+                        notificationCount.style.display = "inline-block";
+                        
+                        notificationList.innerHTML = "";
+                        data.notifications.forEach(notif => {
+                            let item = document.createElement("a");
+                            item.href = notif.url;
+                            item.classList.add("dropdown-item");
+                            item.innerHTML = `<strong>${notif.title}</strong><br><small>${notif.timestamp}</small>`;
+                            notificationList.appendChild(item);
+                        });
+                    } else {
+                        notificationCount.style.display = "none";
+                        notificationList.innerHTML = '<p class="dropdown-item text-muted">No new notifications</p>';
+                    }
+                })
+                .catch(error => console.error("Error fetching notifications:", error));
+        }
+
+        setInterval(fetchNotifications, 5000);  // Refresh every 5 seconds
+        fetchNotifications(); // Initial call
+    });
+</script>
+
+</body>
+</html>

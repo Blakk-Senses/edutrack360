@@ -1,0 +1,26 @@
+<div class="tab-pane fade" id="pills-bulk-onboarding" role="tabpanel" aria-labelledby="pills-bulk-onboarding-tab">
+    <form method="POST" id="bulkOnboardingForm" action="{% url 'cis:bulk_upload_schools' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="container">
+            <h3 class="text-center mb-4">Bulk Upload CSV File</h3>
+            {% if messages %}
+            <div class="alert-container">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            <!-- Clickable File Upload Area -->
+            <div class="file-upload-area" id="uploadArea">
+                <p id="dragDropText"><strong>Drag and Drop a CSV file here, or click to select a file</strong></p>
+                <input type="file" name="csv_file" id="csvFileInput" class="form-control" accept=".csv" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary mt-4">Upload CSV</button>
+        </div>
+    </form>
+</div>

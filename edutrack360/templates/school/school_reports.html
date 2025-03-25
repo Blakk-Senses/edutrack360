@@ -1,0 +1,254 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Performance Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            background-color: #e0f7fa;
+            padding-top: 50px; /* Ensures content doesn't overlap with navbar */
+        }
+
+        .navbar {
+            background-color: #003a3b;
+            color: white;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            padding: 10px 20px;
+        }
+
+        .logo-img {
+            max-width: 120px;
+            height: auto;
+        }
+
+        .card {
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+        .text-center{
+            color: rgb(1, 107, 107);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid d-flex justify-content-between">
+            <a href="{% url 'dashboards:headteacher_dashboard' %}">
+                <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <h3 class="text-center fw-bold">{{user.school}} Performance Trends</h3>
+    
+        <div class="card shadow-sm p-4 mb-4">
+            <div class="row">
+                <div class="col-md-5">
+                    <label class="fw-bold">Academic Year:</label>
+                    <select id="academic_year" class="form-select"></select>
+                </div>
+                <div class="col-md-5">
+                    <label class="fw-bold">Term:</label>
+                    <select id="term" class="form-select"></select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" onclick="fetchPerformanceData()">Generate</button>
+                </div>
+            </div>
+        </div>
+    
+        <!-- Departmental Performance -->
+        <div id="department-section"></div>
+    
+        <!-- Overall School Performance -->
+        <div class="card shadow-sm p-4 mb-4">
+            <h4 class="text-center fw-bold">Overall School Performance</h4>
+            <div id="school-performance-charts" class="mt-3">
+                <canvas id="schoolTermChart"></canvas>
+                <canvas id="schoolYearChart" class="mt-4"></canvas>
+            </div>
+        </div>
+    
+        <div class="text-center mt-4 ">
+            <button class="btn btn-success fw-bold w-100" onclick="downloadPDF()">Download Report as PDF</button>
+        </div>
+    </div>
+    
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetchAvailableTerms();
+        });
+
+        async function fetchAvailableTerms() {
+            let response = await fetch("/school/available_terms/");
+            let data = await response.json();
+
+            let yearDropdown = document.getElementById("academic_year");
+            let termDropdown = document.getElementById("term");
+
+            data.academic_years.forEach(year => {
+                let option = new Option(year.name, year.id);
+                yearDropdown.add(option);
+            });
+
+            data.terms.forEach(term => {
+                let option = new Option(term.name, term.id);
+                termDropdown.add(option);
+            });
+        }
+
+        async function fetchPerformanceData() {
+            let academic_year = document.getElementById("academic_year").value;
+            let term = document.getElementById("term").value;
+
+            let response = await fetch(`/school/performance_data/?academic_year=${academic_year}&term=${term}`);
+            let data = await response.json();
+
+            // Display only departments from the logged-in user's school
+            renderDepartmentCharts(data.departments);
+        }
+
+
+        function renderDepartmentCharts(departments) {
+            let section = document.getElementById("department-section");
+            section.innerHTML = ""; // Clear previous data
+
+            Object.keys(departments).forEach(department => {
+                let deptDiv = document.createElement("div");
+                deptDiv.classList.add("card", "shadow-sm", "p-4", "mb-4");
+                deptDiv.innerHTML = `
+                    <h4 class="text-center fw-bold">📚 ${department} Performance</h4>
+                    <canvas id="barChart-${department}"></canvas>
+                    <canvas id="lineChart-${department}" class="mt-4"></canvas>
+                `;
+                section.appendChild(deptDiv);
+
+                renderBarChart(departments[department], `barChart-${department}`);
+                renderLineChart(department, `lineChart-${department}`);
+            });
+        }
+
+        function renderBarChart(departmentData, canvasId) {
+            let ctx = document.getElementById(canvasId).getContext("2d");
+            let datasets = [];
+            let subjects = new Set();
+
+            Object.keys(departmentData).forEach(classGroup => {
+                Object.keys(departmentData[classGroup]).forEach(subject => {
+                    subjects.add(subject);
+                });
+            });
+
+            subjects = [...subjects];
+
+            Object.keys(departmentData).forEach(classGroup => {
+                datasets.push({
+                    label: classGroup,
+                    data: subjects.map(subject => {
+                        let subjectData = departmentData[classGroup][subject];
+                        return subjectData !== undefined ? subjectData : 0;
+                    }),
+                    backgroundColor: getRandomColor()
+                });
+            });
+
+            new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: subjects,
+                    datasets: datasets
+                },
+                options: {
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true }
+                    }
+                }
+            });
+        }
+
+        async function renderLineChart(department, canvasId) {
+            let academic_year = document.getElementById("academic_year").value;
+            let response = await fetch(`/school/trend_data/?academic_year=${academic_year}&department=${department}`);
+            let data = await response.json();
+
+            let ctx = document.getElementById(canvasId).getContext("2d");
+
+            new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: ["Term 1", "Term 2", "Term 3"],
+                    datasets: Object.keys(data).map(classGroup => ({
+                        label: classGroup,
+                        data: Object.values(data[classGroup]),
+                        borderColor: getRandomColor(),
+                        fill: false
+                    }))
+                }
+            });
+        }
+
+        async function renderSchoolPerformance(academic_year, term) {
+            let response = await fetch(`/school/performance/?academic_year=${academic_year}&term=${term}`);
+            let data = await response.json();
+
+            let ctx = document.getElementById("schoolTermChart").getContext("2d");
+            new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: Object.keys(data),
+                    datasets: [{
+                        label: "Average Score",
+                        data: Object.values(data),
+                        backgroundColor: "rgba(54, 162, 235, 0.6)"
+                    }]
+                }
+            });
+
+            let yearResponse = await fetch(`/school/performance/?academic_year=${academic_year}`);
+            let yearData = await yearResponse.json();
+
+            let yearCtx = document.getElementById("schoolYearChart").getContext("2d");
+            new Chart(yearCtx, {
+                type: "bar",
+                data: {
+                    labels: Object.keys(yearData),
+                    datasets: [{
+                        label: "Yearly Performance",
+                        data: Object.values(yearData),
+                        backgroundColor: "rgba(255, 99, 132, 0.6)"
+                    }]
+                }
+            });
+        }
+
+        function getRandomColor() {
+            return `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.6)`;
+        }
+
+        function downloadPDF() {
+            let academic_year = document.getElementById("academic_year").value;
+            let term = document.getElementById("term").value;
+            window.open(`/school/download_trends_report/?academic_year=${academic_year}&term=${term}`, "_blank");
+        }
+
+    </script>
+
+</body>
+</html>
