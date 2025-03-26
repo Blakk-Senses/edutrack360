@@ -180,11 +180,12 @@
                             </tr>
                         </tbody>
                     </table>
+                    <div class="mt-4">
+                        <h7 class="card-title text-secondary">Termly Performance Chart</h7>
+                        <canvas id="termLineChart" height="100"></canvas>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="mt-4">
-            <canvas id="termLineChart" height="100"></canvas>
         </div>        
         {{ term_chart|json_script:"term-chart-data" }}
 
@@ -209,11 +210,12 @@
                             </tr>
                         </tbody>
                     </table>
+                    <div class="mt-4">
+                        <h7 class="card-title text-secondary">Yearly Performance Chart</h7>
+                        <canvas id="yearLineChart" height="100"></canvas>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="mt-4">
-            <canvas id="yearLineChart" height="100"></canvas>
         </div>
         
         {{ year_chart|json_script:"year-chart-data" }}
@@ -294,59 +296,48 @@
                             label: 'Class Average',
                             data: termChartData.data,
                             borderColor: '#0d6efd',
-                            backgroundColor: 'rgba(13, 110, 253, 0.2)',
+                            backgroundColor: 'rgba(13,110,253,0.2)',
                             tension: 0.3,
                             fill: true
                         }]
                     },
                     options: {
                         responsive: true,
-                        animation: false, // 🔒 Disable animation for better UX
-                        plugins: {
-                            legend: { display: false }
-                        },
+                        plugins: { legend: { display: false }},
                         scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: { precision: 0 }
-                            }
+                            y: { beginAtZero: true, ticks: { precision: 0 } }
                         }
                     }
                 });
             }
 
+
             // === Year Line Chart ===
             const yearCtx = document.getElementById('yearLineChart')?.getContext('2d');
-            if (yearCtx && yearChartData) {
-                new Chart(yearCtx, {
-                    type: 'line',
-                    data: {
-                        labels: yearChartData.labels,
-                        datasets: [{
-                            label: 'Class Average',
-                            data: yearChartData.data,
-                            borderColor: '#198754',
-                            backgroundColor: 'rgba(25, 135, 84, 0.2)',
-                            tension: 0.3,
-                            fill: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        animation: false, // 🔒 Disable animation for better UX
-                        plugins: {
-                            legend: { display: false }
+                if (yearCtx && yearChartData) {
+                    new Chart(yearCtx, {
+                        type: 'line',
+                        data: {
+                            labels: yearChartData.labels,
+                            datasets: [{
+                                label: 'Class Average',
+                                data: yearChartData.data,
+                                borderColor: '#198754',
+                                backgroundColor: 'rgba(25,135,84,0.2)',
+                                tension: 0.3,
+                                fill: true
+                            }]
                         },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: { precision: 0 }
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: false }},
+                            scales: {
+                                y: { beginAtZero: true, ticks: { precision: 0 } }
                             }
                         }
-                    }
-                });
-            }
-        });
+                    });
+                }
+            });
     </script>
 </body>
 </html>

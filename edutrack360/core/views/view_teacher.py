@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
-from django.http import JsonResponse, HttpResponse, Http404
-from django.shortcuts import render, redirect
+from django.http import JsonResponse, HttpResponse, Http404, HttpResponseForbidden
+from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import render_to_string
 import csv
 import pandas as pd
@@ -9,7 +9,7 @@ from django.contrib import messages
 import json
 import io
 from decimal import Decimal
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.contrib.auth.decorators import login_required
 from core.forms import ResultUploadForm 
 from core.models import (
@@ -23,20 +23,28 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.graphics.charts.textlabels import Label
+from reportlab.lib.colors import HexColor
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.http import HttpResponse
 from django.db.models import Avg
 from django.shortcuts import render
 import json
-
-
+from django.core.paginator import Paginator
+from django.views.decorators.http import require_POST
 
 
 User = get_user_model()
 
-def upload_results(request):
-    return render(request, 'teacher/upload_results.html')
+def upload_subject_results(request):
+    return render(request, 'teacher/subject_upload_results.html')
+
+def upload_class_results(request):
+    return render(request, 'teacher/class_upload_results.html')
 
 def progress_trends(request):
     return render(request, 'teacher/progress_trends.html')
@@ -496,8 +504,8 @@ def get_class_performance_context(request):
     for mark in selected_marks:
         student_key = f"{mark.student.last_name} {mark.student.first_name}"
         if student_key not in students:
-            students[student_key] = {"name": student_key, "subjects": {}, "avg": 0}
-        students[student_key]["subjects"][mark.subject.name] = float(mark.mark)
+            students[student_key] = {"name": student_key, "marks": {}, "avg": 0}
+        students[student_key]["marks"][mark.subject.name] = float(mark.mark)
         subjects.add(mark.subject.name)
 
     print("👩‍🎓 Total unique students:", len(students))
@@ -510,8 +518,8 @@ def get_class_performance_context(request):
     for student_data in students.values():
         marks = []
         for subject in subjects:
-            mark = student_data["subjects"].get(subject, "-")
-            student_data[subject] = round(mark, 2) if isinstance(mark, (int, float)) else "-"
+            mark = student_data["marks"].get(subject, "-")
+            student_data["marks"][subject] = round(mark, 2) if isinstance(mark, (int, float)) else "-"
             if isinstance(mark, (int, float)):
                 marks.append(mark)
                 subject_totals[subject].append(mark)
@@ -520,12 +528,12 @@ def get_class_performance_context(request):
 
     print("🧮 Completed student row generation.")
 
-    class_average_row = {"name": "Subject Average"}
+    class_average_row = {"name": "Subject Average", "marks": {}}
     subject_avgs = []
     for subject in subjects:
         scores = subject_totals[subject]
         avg = round(sum(scores) / len(scores), 2) if scores else "-"
-        class_average_row[subject] = avg
+        class_average_row["marks"][subject] = avg
         if isinstance(avg, (int, float)):
             subject_avgs.append(avg)
     class_average_row["avg"] = round(sum(subject_avgs) / len(subject_avgs), 2) if subject_avgs else "-"
@@ -627,50 +635,120 @@ def class_performance_analysis(request):
     context = get_class_performance_context(request)
     return render(request, "teacher/class_performance_analysis.html", context)
 
+
 @login_required
 def download_class_performance_pdf(request):
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=120)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=120, bottomMargin=50)
     elements = []
     styles = getSampleStyleSheet()
     subtitle_style = styles['Heading4']
 
     # ✅ Get context
     context = get_class_performance_context(request)
-
     year = context['selected_year']
     term = context['selected_term']
     subject_list = context["subjects"]
-    performance_rows = context['student_rows']  # ✅ fixed key name
+    performance_rows = context['student_rows']
     term_trend = context['term_trend']
     academic_trend = context['academic_trend']
+    score_buckets = context['score_buckets']
 
     # 🧠 Get class and school details
     teacher = Teacher.objects.get(user=request.user)
     class_teacher = ClassTeacher.objects.get(teacher=teacher)
-
     class_group = class_teacher.assigned_class
     school_name = f"School: {request.user.school.name}"
+
+    # --- Compute Subject Averages ---
+    subject_totals = {subject: 0 for subject in subject_list}
+    subject_counts = {subject: 0 for subject in subject_list}
+
+    for row in performance_rows:
+        for subject in subject_list:
+            mark = row["marks"].get(subject)
+            if isinstance(mark, (int, float)):
+                subject_totals[subject] += mark
+                subject_counts[subject] += 1
+
+    subject_averages = {
+        subject: round(subject_totals[subject] / subject_counts[subject], 1)
+        if subject_counts[subject] > 0 else "-"
+        for subject in subject_list
+    }
 
     # --- Student Subject Performance Table
     elements.append(Paragraph("Student Subject Performance", subtitle_style))
     table_data = [["Student Name"] + subject_list + ["Average"]]
 
     for row in performance_rows:
-        student_row = [row["name"]]
+        row_data = [row["name"]]
         for subject in subject_list:
-            student_row.append(row.get(subject, "-"))  # ✅ direct access
-        student_row.append(row["avg"])  # ✅ fixed key name
-        table_data.append(student_row)
+            row_data.append(row["marks"].get(subject, "-"))
+        row_data.append(row["avg"])
+        table_data.append(row_data)
 
-    student_table = Table(table_data, colWidths=[120] + [60] * len(subject_list) + [60])
+    # ✅ Append Subject Average row
+    avg_row = ["Subject Average"]
+    for subject in subject_list:
+        avg_row.append(subject_averages.get(subject, "-"))
+    avg_row.append("-")  # Final column for Average of averages (not needed here)
+    table_data.append(avg_row)
+
+    max_subjects = len(subject_list)
+    available_width = A4[0] - 100
+    col_widths = [120] + [available_width / (max_subjects + 1)] * max_subjects + [50]
+
+    student_table = Table(table_data, colWidths=col_widths, repeatRows=1)
     student_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, len(table_data) - 1), (-1, len(table_data) - 1), 'Helvetica-Bold'),  # Subject average row
+        ('BACKGROUND', (0, len(table_data) - 1), (-1, len(table_data) - 1), colors.HexColor("#f9f9f9")),
     ]))
     elements.extend([student_table, Spacer(1, 20)])
+
+    # --- Score Bucket Table (2 columns)
+    elements.append(Paragraph("Score Distribution Buckets", subtitle_style))
+    bucket_table_data = [
+        ["Score Range", "Number of Students"],
+        ["80-100", score_buckets["80-100"]],
+        ["55-79", score_buckets["55-79"]],
+        ["50-54", score_buckets["50-54"]],
+        ["40-49", score_buckets["40-49"]],
+        ["0-39", score_buckets["0-39"]],
+    ]
+    bucket_table = Table(bucket_table_data, colWidths=[120, 120])
+    bucket_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    ]))
+    elements.extend([bucket_table, Spacer(1, 10)])
+
+    # --- Score Bucket Bar Chart
+    drawing = Drawing(400, 180)
+    bar = VerticalBarChart()
+    bar.x = 50
+    bar.y = 30
+    bar.height = 120
+    bar.width = 300
+    bar.data = [[
+        score_buckets["80-100"],
+        score_buckets["55-79"],
+        score_buckets["50-54"],
+        score_buckets["40-49"],
+        score_buckets["0-39"],
+    ]]
+    bar.categoryAxis.categoryNames = ["80-100", "55-79", "50-54", "40-49", "0-39"]
+    bar.barWidth = 15
+    bar.strokeColor = colors.black
+    bar.valueAxis.valueMin = 0
+    bar.bars[0].fillColor = colors.HexColor("#4a90e2")
+    drawing.add(bar)
+    elements.extend([Paragraph("Score Bucket Bar Chart", subtitle_style), drawing, Spacer(1, 20)])
 
     # --- Term Trend Table
     elements.append(Paragraph("Termly Performance Trend", subtitle_style))
@@ -694,60 +772,49 @@ def download_class_performance_pdf(request):
     ]))
     elements.extend([year_table, Spacer(1, 20)])
 
-    # --- Build with header
+    # --- Header and Footer
     def draw_custom_header(c, school_name, class_group_name, academic_year, term):
         page_width, page_height = A4
         banner_color = colors.HexColor("#f2f2f2")
         text_color = colors.black
 
-        # Top banner
         c.setFillColor(banner_color)
         c.rect(0, page_height - 60, page_width, 60, fill=1, stroke=0)
-
-        # Title
         c.setFillColor(text_color)
         c.setFont("Helvetica-Bold", 18)
-        title = "Class Performance Report"
-        c.drawCentredString(page_width / 2, page_height - 35, title)
+        c.drawCentredString(page_width / 2, page_height - 35, "Class Performance Report")
 
-        # School name
         c.setFont("Helvetica", 12)
         c.drawCentredString(page_width / 2, page_height - 52, school_name)
 
-        # Info strip
         c.setFillColor(banner_color)
         c.rect(0, page_height - 85, page_width, 25, fill=1, stroke=0)
-
         c.setFillColor(text_color)
         c.setFont("Helvetica-Bold", 10)
         info_text = f"Class: {class_group_name}    |    Academic Year: {academic_year}    |    Term: {term}"
         c.drawCentredString(page_width / 2, page_height - 70, info_text)
 
-    # 📄 Render PDF
-    doc.build(elements, onFirstPage=lambda c, d: draw_custom_header(
-        c,
-        school_name,
-        class_group.name,
-        year,
-        term
-    ))
+    def draw_footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica', 9)
+        canvas.drawCentredString(A4[0] / 2, 30, f"Page {doc.page}")
+        canvas.restoreState()
+
+    # --- Build PDF
+    doc.build(
+        elements,
+        onFirstPage=lambda c, d: [draw_custom_header(c, school_name, class_group.name, year, term), draw_footer(c, d)],
+        onLaterPages=draw_footer
+    )
 
     buffer.seek(0)
-
-    # ✅ File name: Basic5_Class_Performance_2024_2025_Term1.pdf
     safe_class = class_group.name.replace(" ", "")
     safe_year = str(year).replace("/", "_")
     filename = f"{safe_class}_Class_Performance_{safe_year}_{term}.pdf"
 
     response = HttpResponse(buffer, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["Content-Disposition"] = f"attachment; filename={filename}"
     return response
-
-
-
-
-
-
 
 
 #---------------UPLOAD RESULTS----------------------------
@@ -790,19 +857,24 @@ def manual_upload_result(request):
     first_name = name_parts[0]
     last_name = name_parts[1] if len(name_parts) > 1 else ""
 
-    # Fetch or create student
+    # Fetch or create student with teacher's school, circuit, and district
     student, created = Student.objects.get_or_create(
         first_name=first_name,
         last_name=last_name,
-        school=request.user.school,
-        defaults={"class_group": class_group}
+        school=request.user.school,  # Ensure student gets the teacher's school
+        defaults={
+            "class_group": class_group,
+            "circuit": request.user.circuit,  # Assign teacher's circuit
+            "district": request.user.district  # Assign teacher's district
+        }
     )
 
+    # If student exists but class is different, update class_group
     if not created and student.class_group != class_group:
         student.class_group = class_group
         student.save()
 
-    # Create result entry
+    # Create result entry with school, circuit, and district
     Result.objects.create(
         academic_year=academic_year,
         class_group=class_group,
@@ -812,10 +884,13 @@ def manual_upload_result(request):
         mark=mark,
         teacher=request.user,
         school=request.user.school,
+        circuit=request.user.circuit,  # Include circuit in result
+        district=request.user.district,  # Include district in result
         status="Pending"
     )
 
     return JsonResponse({"message": "Result uploaded successfully!"}, status=201)
+
 
 
 @login_required
@@ -845,9 +920,13 @@ def bulk_upload_results(request):
     valid_terms = {"Term 1", "Term 2", "Term 3"}
 
     teacher = request.user.teacher_profile
+    teacher_school = request.user.school
+    teacher_circuit = request.user.circuit
+    teacher_district = request.user.district
+
     existing_students = {
         f"{s.first_name} {s.last_name}".strip(): s
-        for s in Student.objects.filter(school=request.user.school)
+        for s in Student.objects.filter(school=teacher_school)
     }
 
     for index, row in df.iterrows():
@@ -908,8 +987,12 @@ def bulk_upload_results(request):
             student, _ = Student.objects.get_or_create(
                 first_name=first_name,
                 last_name=last_name,
-                school=request.user.school,
-                defaults={"class_group": class_group}
+                school=teacher_school,
+                defaults={
+                    "class_group": class_group,
+                    "circuit": teacher_circuit,
+                    "district": teacher_district
+                }
             )
             existing_students[student_key] = student
 
@@ -918,18 +1001,21 @@ def bulk_upload_results(request):
             student.save()
 
         valid_results.append(
-            Result(
-                academic_year=academic_year,
-                class_group=class_group,
-                subject=subject,
-                term=term,
-                student=student,
-                mark=mark,
-                teacher=request.user,
-                school=request.user.school,
-                status="Pending"
-            )
+        Result(
+            academic_year=academic_year,
+            class_group=class_group,
+            subject=subject,
+            term=term,
+            student=student,
+            mark=mark,
+            teacher=request.user,
+            school=teacher_school,
+            circuit=teacher_circuit,
+            district=teacher_district,
+            status="Pending"
         )
+    )
+
 
     if valid_results:
         inserted_results = Result.objects.bulk_create(valid_results)
@@ -1029,3 +1115,187 @@ def download_result_template(request):
     return JsonResponse({"error": "Invalid file format"}, status=400)
 
 
+#------------------ RESULT MANAGEMENT -------------------
+
+
+@login_required
+def result_management(request):
+    user = request.user
+    teacher = getattr(user, "teacher_profile", None)
+
+    if not teacher:
+        return render(request, "results/no_access.html")
+
+    result_qs = Result.objects.none()
+
+    class_teacher_qs = ClassTeacher.objects.filter(teacher=teacher)
+    if class_teacher_qs.exists():
+        assigned_class = class_teacher_qs.first().assigned_class
+        result_qs = Result.objects.filter(class_group=assigned_class)
+    else:
+        subject_teacher_qs = SubjectTeacher.objects.filter(teacher=teacher)
+        if subject_teacher_qs.exists():
+            filters = Q()
+            for st in subject_teacher_qs:
+                filters |= Q(subject=st.subject, class_group__in=st.assigned_classes.all(), teacher=user)
+            result_qs = Result.objects.filter(filters)
+
+    if not result_qs.exists():
+        return render(request, "results/no_access.html")
+
+    grouped_files = (
+        result_qs
+        .values("academic_year", "term", "class_group", "subject")
+        .annotate(
+            total=Count("id"),
+            confirmed=Count("id", filter=Q(status="Submitted"))
+        )
+    )
+
+    result_files = []
+    for group in grouped_files:
+        status = "Submitted" if group["total"] == group["confirmed"] else "Pending"
+        class_group = ClassGroup.objects.get(id=group["class_group"])
+        subject = Subject.objects.get(id=group["subject"])
+
+        result_files.append({
+            "academic_year": group["academic_year"],
+            "term": group["term"],
+            "class_group_id": class_group.id,
+            "class_group_name": class_group.name,
+            "subject_id": subject.id,
+            "subject_name": subject.name,
+            "status": status,
+            "total_students": group["total"],
+        })
+
+    paginator = Paginator(result_files, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "teacher/result_management.html", {
+        "page_obj": page_obj
+    })
+
+
+@login_required
+def view_result_file(request, academic_year, term, class_group_id, subject_id):
+    user = request.user
+    teacher = getattr(user, "teacher_profile", None)
+    if not teacher:
+        return HttpResponseForbidden("Access denied.")
+
+    class_group = get_object_or_404(ClassGroup, id=class_group_id)
+    subject = get_object_or_404(Subject, id=subject_id)
+
+    if ClassTeacher.objects.filter(teacher=teacher, assigned_class=class_group).exists():
+        results = Result.objects.filter(
+            academic_year=academic_year,
+            term=term,
+            class_group=class_group,
+            subject=subject
+        )
+    elif SubjectTeacher.objects.filter(
+        teacher=teacher,
+        subject=subject,
+        assigned_classes=class_group
+    ).exists():
+        results = Result.objects.filter(
+            academic_year=academic_year,
+            term=term,
+            class_group=class_group,
+            subject=subject,
+            teacher=request.user
+        )
+    else:
+        return HttpResponseForbidden("Unauthorized access.")
+
+    return render(request, "teacher/view_result_file.html", {
+        "results": results,
+        "class_group": class_group,
+        "subject": subject,
+        "academic_year": academic_year,
+        "term": term,
+    })
+
+
+@login_required
+@require_POST
+def confirm_result_file(request):
+    academic_year = request.POST.get("academic_year")
+    term = request.POST.get("term")
+    class_group_id = request.POST.get("class_group_id")
+    subject_id = request.POST.get("subject_id")
+
+    teacher = getattr(request.user, "teacher_profile", None)
+    if not teacher:
+        return JsonResponse({"error": "Access denied"}, status=403)
+
+    class_group = get_object_or_404(ClassGroup, id=class_group_id)
+    subject = get_object_or_404(Subject, id=subject_id)
+
+    if ClassTeacher.objects.filter(teacher=teacher, assigned_class=class_group).exists():
+        result_qs = Result.objects.filter(
+            academic_year=academic_year,
+            term=term,
+            class_group=class_group,
+            subject=subject
+        )
+    elif SubjectTeacher.objects.filter(
+        teacher=teacher,
+        subject=subject,
+        assigned_classes=class_group
+    ).exists():
+        result_qs = Result.objects.filter(
+            academic_year=academic_year,
+            term=term,
+            class_group=class_group,
+            subject=subject,
+            teacher=request.user
+        )
+    else:
+        return JsonResponse({"error": "Unauthorized"}, status=403)
+
+    updated = result_qs.update(status="Submitted")
+    return JsonResponse({"message": f"{updated} result(s) confirmed."}, status=200)
+
+
+@login_required
+@require_POST
+def delete_result_file(request):
+    academic_year = request.POST.get("academic_year")
+    term = request.POST.get("term")
+    class_group_id = request.POST.get("class_group_id")
+    subject_id = request.POST.get("subject_id")
+
+    teacher = getattr(request.user, "teacher_profile", None)
+    if not teacher:
+        return JsonResponse({"error": "Access denied"}, status=403)
+
+    class_group = get_object_or_404(ClassGroup, id=class_group_id)
+    subject = get_object_or_404(Subject, id=subject_id)
+
+    if ClassTeacher.objects.filter(teacher=teacher, assigned_class=class_group).exists():
+        result_qs = Result.objects.filter(
+            academic_year=academic_year,
+            term=term,
+            class_group=class_group,
+            subject=subject
+        )
+    elif SubjectTeacher.objects.filter(
+        teacher=teacher,
+        subject=subject,
+        assigned_classes=class_group
+    ).exists():
+        result_qs = Result.objects.filter(
+            academic_year=academic_year,
+            term=term,
+            class_group=class_group,
+            subject=subject,
+            teacher=request.user
+        )
+    else:
+        return JsonResponse({"error": "Unauthorized"}, status=403)
+
+    deleted, _ = result_qs.delete()
+    return JsonResponse({"message": f"{deleted} result(s) deleted permanently."}, status=200)

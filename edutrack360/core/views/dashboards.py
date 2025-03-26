@@ -420,17 +420,17 @@ def class_teacher_dashboard(request):
 
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return JsonResponse({
-            "total_students_assessed": student_marks.count(),
+            "total_students_assessed": student_marks.values("student").distinct().count(),
             "average_class_performance": round(average_class_performance, 2),
             "best_students": [
                 {
-                    "name": f"{s['student__first_name']} {s['student__last_name']}",
+                    "name": f"{s['student__last_name']} {s['student__first_name']}",
                     "mark": round(s["avg_mark"], 2) if s["avg_mark"] is not None else None
                 } for s in best_students
             ],
             "weakest_students": [
                 {
-                    "name": f"{s['student__first_name']} {s['student__last_name']}",
+                    "name": f"{s['student__last_name']} {s['student__first_name']}",
                     "mark": round(s["avg_mark"], 2) if s["avg_mark"] is not None else None
                 } for s in weakest_students
             ],

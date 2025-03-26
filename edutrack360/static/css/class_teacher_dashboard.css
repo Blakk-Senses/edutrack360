@@ -168,19 +168,6 @@ body {
     padding: 20px;
 }
 
-.dashboard-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: white;
-    border-radius: 10px;
-    padding: 20px;
-    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-    position: relative;
-    border-left: 5px solid #007BFF;
-    min-height: 100px;
-}
-
 .dashboard-card h3 {
     font-size: 14px;
     text-transform: uppercase;
@@ -196,15 +183,52 @@ body {
 
 .dashboard-card .icon {
     font-size: 32px;
-    color: #007BFF;
+    color: inherit; /* Inherits text color from parent */
 }
 
-/* Unique colors for each card */
-.total-students-assessed { border-left-color: #28A745; }
-.average-class-performance { border-left-color: #17A2B8; }
-.best-performing-subject { border-left-color: #FFC107; }
-.weakest-performing-subject { border-left-color: #DC3545; }
-.top-students { border-left-color: #6F42C1; }
+/* Ensuring the parent container has the correct text color */
+.dashboard-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    position: relative;
+    border-left: 5px solid; /* Default border */
+    min-height: 100px;
+}
+
+/* Assigning both border and text color */
+.total-students-assessed {
+    border-left-color: #22027c; /* Green */
+    color: #22027c;
+}
+
+.average-class-performance {
+    border-left-color: #17A2B8; /* Cyan */
+    color: #17A2B8;
+}
+
+.best-performing-students {
+    border-left-color: #28A745; /* Green */
+    color: #28A745;
+}
+
+.weakest-performing-students {
+    border-left-color: #DC3545; /* Red */
+    color: #DC3545;
+}
+
+.top-performing-subject {
+    border-left-color: #6002b7; /* Purple */
+    color: #6002b7;
+}
+.bottom-performing-subject {
+    border-left-color: #d96003; /* Purple */
+    color: #d96003;
+}
 
 .navbar {
     display: flex;

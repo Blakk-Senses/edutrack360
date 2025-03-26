@@ -64,7 +64,7 @@
             <div class="card-body">
                 <h3 class="card-title mb-4 text-secondary">Class Performance Analysis</h3>
                 <form method="get" class="row g-3 align-items-end">
-                    <div class="col-md-4">
+                    <div class="col-md-5">
                         <label class="form-label fw-semibold">Academic Year</label>
                         <select name="academic_year" class="form-select">
                             {% for year in academic_years %}
@@ -72,7 +72,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-5">
                         <label class="form-label fw-semibold">Term</label>
                         <select name="term" class="form-select">
                             {% for term in terms %}
@@ -92,38 +92,68 @@
         <!-- 🎓 Student Subject Performance -->
         <div class="card shadow-sm border-0 mb-5">
             <div class="card-body">
-                <h5 class="card-title text-secondary">🎓 Student Subject Performance</h5>
+                <h5 class="card-title text-secondary">Student Subject Performance</h5>
                 <div class="table-responsive mt-3">
                     <table class="table table-sm table-striped table-hover align-middle">
                         <thead class="table-light text-nowrap">
                             <tr>
                                 <th>Student Name</th>
-                                {% for subject in subject_list %}
+                                {% for subject in subjects %}
                                     <th>{{ subject }}</th>
                                 {% endfor %}
                                 <th>Average</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for row in student_performance_rows %}
+                            {% for row in student_rows %}
                                 <tr>
                                     <td>{{ row.name }}</td>
-                                    {% for subject in subject_list %}
+                                    {% for subject in subjects %}
                                         <td>{{ row.marks|get_item:subject|default:"-" }}</td>
                                     {% endfor %}
-                                    <td class="fw-bold">{{ row.average|default:"-" }}</td>
+                                    <td class="fw-bold">{{ row.avg|default:"-" }}</td>
                                 </tr>
                             {% endfor %}
+                            <tr class="table-light fw-bold">
+                                <td>{{ class_average_row.name }}</td>
+                                {% for subject in subjects %}
+                                    <td>{{ class_average_row.marks|get_item:subject|default:"-" }}</td>
+                                {% endfor %}
+                                <td>{{ class_average_row.avg|default:"-" }}</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
+
+        <div class="row mb-4">
+            <!-- 📊 Pie Chart Column -->
+            <div class="col-md-6 mb-4 mb-md-0">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title text-secondary">Score Distribution (Pie)</h5>
+                        <canvas id="scorePieChart" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+        
+            <!-- 🔥 Heatmap Column -->
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title text-secondary">Class Performance Heatmap</h5>
+                        <canvas id="heatmapChart" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+                
     
         <!-- 📈 Termly Performance Trend -->
         <div class="card shadow-sm border-0 mb-5">
             <div class="card-body">
-                <h5 class="card-title text-secondary">📈 Termly Performance Trend</h5>
+                <h5 class="card-title text-secondary">Termly Performance Trend</h5>
                 <div class="table-responsive mt-3">
                     <table class="table table-bordered table-hover text-center">
                         <thead class="table-light">
@@ -142,6 +172,7 @@
                         </tbody>
                     </table>
                 </div>
+                <h7 class="card-title text-secondary">Termly Performance Chart</h7>
                 <canvas id="termLineChart" height="100"></canvas>
             </div>
         </div>
@@ -150,7 +181,7 @@
         <!-- 📆 Yearly Performance Trend -->
         <div class="card shadow-sm border-0 mb-5">
             <div class="card-body">
-                <h5 class="card-title text-secondary">📆 Yearly Performance Trend</h5>
+                <h5 class="card-title text-secondary">Yearly Performance Trend</h5>
                 <div class="table-responsive mt-3">
                     <table class="table table-bordered table-hover text-center">
                         <thead class="table-light">
@@ -169,18 +200,20 @@
                         </tbody>
                     </table>
                 </div>
+                <h7 class="card-title text-secondary">Yearly Performance Chart</h7>
                 <canvas id="yearLineChart" height="100"></canvas>
             </div>
         </div>
         {{ year_chart|json_script:"year-chart-data" }}
     
         <!-- ⬇️ PDF Download -->
-        <div class="shadow-sm border rounded px-4 py-3 mt-4 text-end">
+        <div class="shadow-sm border rounded px-4 py-3 mt-4">
             <a href="{% url 'teacher:download_class_performance_pdf' %}?academic_year={{ selected_year }}&term={{ selected_term }}"
-               class="btn btn-outline-primary">
+            class="btn btn-outline-primary w-100">
                 ⬇️ Download PDF Report
             </a>
         </div>
+
     </div>
     
     <!-- 🔗 Charts -->
@@ -214,7 +247,74 @@
                     }
                 });
             }
-    
+            
+            const pieCtx = document.getElementById('scorePieChart').getContext('2d');
+            new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['80-100', '55-79', '50-54', '40-49', '0-39'],
+                    datasets: [{
+                        data: [
+                            {{ bucket_80_100 }},
+                            {{ bucket_55_79 }},
+                            {{ bucket_50_54 }},
+                            {{ bucket_40_49 }},
+                            {{ bucket_0_39 }}
+                        ],
+                        backgroundColor: ['#4caf50', '#8bc34a', '#ffeb3b', '#ff9800', '#f44336'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: { position: 'right' },
+                        tooltip: { enabled: true }
+                    }
+                }
+            });
+
+            // 🔥 Heatmap Bar Chart
+            const heatmapCtx = document.getElementById('heatmapChart').getContext('2d');
+            const heatmapLabels = [
+                {% for entry in heatmap_data %}
+                    "{{ entry.name }}",
+                {% endfor %}
+            ];
+            const heatmapValues = [
+                {% for entry in heatmap_data %}
+                    {{ entry.mark }},
+                {% endfor %}
+            ];
+
+            new Chart(heatmapCtx, {
+                type: 'bar',
+                data: {
+                    labels: heatmapLabels,
+                    datasets: [{
+                        label: 'Average Score',
+                        data: heatmapValues,
+                        backgroundColor: heatmapValues.map(val => {
+                            if (val >= 80) return '#4caf50';
+                            if (val >= 55) return '#8bc34a';
+                            if (val >= 50) return '#ffeb3b';
+                            if (val >= 40) return '#ff9800';
+                            return '#f44336';
+                        }),
+                        borderRadius: 4,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    scales: {
+                        x: { beginAtZero: true, max: 100 }
+                    },
+                    plugins: {
+                        tooltip: { enabled: true },
+                        legend: { display: false }
+                    }
+                }
+            });
             const yearCtx = document.getElementById('yearLineChart')?.getContext('2d');
             if (yearCtx && yearChartData) {
                 new Chart(yearCtx, {

@@ -30,13 +30,17 @@
             <i class="fas fa-tachometer-alt"></i>
             <span class="tooltip">Dashboard</span>
         </a>
-        <a href="{% url 'teacher:upload_results' %}">
+        <a href="{% url 'teacher:upload_subject_results' %}">
             <i class="fas fa-file-upload"></i>
             <span class="tooltip">Upload Results</span>
         </a>
         <a href="{% url 'teacher:subject_performance_analysis' %}">
             <i class="fas fa-chart-bar"></i>
             <span class="tooltip">Subject Performance Analysis</span>
+        </a>
+        <a href="{% url 'teacher:result_management' %}">
+            <i class="fas fa-chart-bar"></i>
+            <span class="tooltip">Result Management</span>
         </a>
         <a href="{% url 'teacher:settings' %}">
             <i class="fas fa-cog"></i>

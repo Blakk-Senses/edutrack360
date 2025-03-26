@@ -1,11 +1,13 @@
 from django.urls import path
 from core.views.view_teacher import (
-    upload_results, subject_performance_analysis,progress_trends,
+    subject_performance_analysis,progress_trends,
     settings, get_classes_by_department,
     get_available_terms, get_departments, get_subjects_by_department,
     manual_upload_result, bulk_upload_results, download_result_template,
     get_classes, get_class_department, download_subject_analysis_pdf,
     class_performance_analysis, download_class_performance_pdf,
+    upload_class_results, upload_subject_results, result_management,
+    view_result_file, confirm_result_file, delete_result_file,
     
 )
 
@@ -21,7 +23,8 @@ urlpatterns = [
     path('classes/<int:class_group_id>/department/', get_class_department, name='get_class_department'),
 
 
-    path('upload-result/', upload_results, name='upload_results'),
+    path('upload-class-result/', upload_class_results, name='upload_class_results'),
+    path('upload-subject-result/', upload_subject_results, name='upload_subject_results'),
     path('upload-result/manual/', manual_upload_result, name='manual_upload'),
 
     path('upload-result/bulk/', bulk_upload_results, name='bulk_upload'),
@@ -38,7 +41,12 @@ urlpatterns = [
     path("class-performance-analysis/", class_performance_analysis, name="class_performance_analysis"),
     path("class-performance/download/", download_class_performance_pdf, name="download_class_performance_pdf"),
 
-    
+    path('manage-results/', result_management, name='result_management'),
+    # urls.py
+    path('view/<str:academic_year>/<str:term>/<int:class_id>/<int:subject_id>/', view_result_file, name='view_result_file'),
+    path('confirm/<str:academic_year>/<str:term>/<int:class_id>/<int:subject_id>/', confirm_result_file, name='confirm_result_file'),
+    path('delete/<str:academic_year>/<str:term>/<int:class_id>/<int:subject_id>/', delete_result_file, name='delete_result_file'),
+
 
 ]
 
