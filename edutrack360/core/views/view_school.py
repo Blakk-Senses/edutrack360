@@ -7,9 +7,22 @@ from core.models import (
     Department, Subject, Result, Teacher,  
     ClassTeacher, SubjectTeacher, ClassGroup, StudentMark 
 )
+import io
+from collections import defaultdict
 from django.http import HttpResponse
-from reportlab.lib.pagesizes import A4, letter, landscape
-from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
+)
+from reportlab.graphics.shapes import Drawing, String
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from reportlab.platypus import Image
 from openpyxl import Workbook
 from openpyxl.worksheet.datavalidation import DataValidation
 from django.shortcuts import render, get_object_or_404, redirect
@@ -561,162 +574,27 @@ def download_teacher_template(request, file_format):
         return HttpResponse("Invalid file format", status=400)
 
 
-# ----------------- PROGRESS AND TRENDS -------------------------------
-
-def progress_trends(request):
-    return render(request, 'school/school_reports.html')
-
-
+@login_required
 def get_available_terms(request):
     """Returns available academic terms and years in an object format with 'id' and 'name'."""
     
-    # Generate academic years with id and name
-    academic_years = [{"id": year[0], "name": year[0]} for year in [(f"{y}/{y+1}", f"{y}/{y+1}") for y in range(2020, 2150)]]
+    academic_year_str = request.GET.get("academic_year", "2024/2025")  # Default to current year format
+    if "/" in academic_year_str:
+        try:
+            base_year = int(academic_year_str.split("/")[0])  # Extract base year (e.g., 2024)
+        except ValueError:
+            return JsonResponse({"error": "Invalid academic year format"}, status=400)
+    else:
+        try:
+            base_year = int(academic_year_str)  # Fallback if single year is provided
+            academic_year_str = f"{base_year}/{base_year + 1}"
+        except ValueError:
+            return JsonResponse({"error": "Invalid academic year format"}, status=400)
 
-    # Generate terms with id and name
+    academic_years = [{"id": year, "name": f"{year}/{year+1}"} for year in range(2020, 2050)]
     terms = [{"id": i + 1, "name": term} for i, term in enumerate(["Term 1", "Term 2", "Term 3"])]
 
-    return JsonResponse({"terms": terms, "academic_years": academic_years})
-
-def get_performance_data(request):
-    term = request.GET.get("term")
-    academic_year = request.GET.get("academic_year")
-    school = request.user.school  # Get school from logged-in user
-
-    data = {}
-
-    # Fetch only marks from students in the logged-in user's school
-    marks = StudentMark.objects.filter(term=term, academic_year=academic_year, student__school=school)
-
-    for mark in marks:
-        if not mark.department:  # Handle cases where department is null
-            continue
-
-        dept_name = mark.department.name  # Ensure department belongs to this school
-        class_name = mark.class_group.name
-        subject_name = mark.subject.name
-
-        if dept_name not in data:
-            data[dept_name] = {}
-
-        if class_name not in data[dept_name]:
-            data[dept_name][class_name] = {}
-
-        if subject_name not in data[dept_name][class_name]:
-            data[dept_name][class_name][subject_name] = []
-
-        data[dept_name][class_name][subject_name].append(float(mark.mark))
-
-    # Compute averages
-    for dept in data:
-        for class_group in data[dept]:
-            for subject in data[dept][class_group]:
-                data[dept][class_group][subject] = round(
-                    sum(data[dept][class_group][subject]) / len(data[dept][class_group][subject]), 2
-                )
-
-    return JsonResponse({"departments": data})
-
-
-def get_trend_data(request):
-    class_group = request.GET.get("class_group")
-    academic_year = request.GET.get("academic_year")
-    school = request.user.school  # Get logged-in user's school
-
-    terms = ["Term 1", "Term 2", "Term 3"]
-    trend_data = {}
-
-    for term in terms:
-        marks = StudentMark.objects.filter(
-            class_group__name=class_group, 
-            academic_year=academic_year, 
-            term=term, 
-            student__school=school  # Filter by school
-        )
-        avg_mark = marks.aggregate(avg=Avg("mark"))["avg"]
-        trend_data[term] = round(avg_mark, 2) if avg_mark else 0
-
-    return JsonResponse({class_group: trend_data})
-
-def get_school_performance(request):
-    academic_year = request.GET.get("academic_year")
-    term = request.GET.get("term")
-    school = request.user.school
-
-    previous_terms = {
-        "Term 1": ["Term 1", "Term 2", "Term 3"],  # If Term 1, get last 3 terms
-        "Term 2": ["Term 2", "Term 3", "Term 1"],
-        "Term 3": ["Term 3", "Term 1", "Term 2"],
-    }
-
-    terms_to_fetch = previous_terms.get(term, ["Term 1", "Term 2", "Term 3"])
-    
-    performance_data = {}
-
-    for t in terms_to_fetch:
-        marks = StudentMark.objects.filter(academic_year=academic_year, term=t, student__school=school)
-        avg_mark = marks.aggregate(avg=Avg("mark"))["avg"]
-        performance_data[t] = round(avg_mark, 2) if avg_mark else 0
-
-    return JsonResponse(performance_data)
-
-
-def generate_school_report_pdf(request):
-    academic_year = request.GET.get("academic_year")
-    term = request.GET.get("term")
-    school = request.user.school
-
-    # Fetch school-wide performance data
-    school_performance = get_school_performance(request).content.decode("utf-8")
-    
-    # Fetch department-wise performance
-    department_performance = get_performance_data(request).content.decode("utf-8")
-
-    # Fetch class trend data
-    class_trend_data = get_trend_data(request).content.decode("utf-8")
-
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{school.name}_performance_trends_{term}_{academic_year}.pdf"'
-
-    buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=landscape(letter))
-
-    pdf.setTitle(f"{school.name} Performance Report - {academic_year} {term}")
-    pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawString(200, 550, f"{school.name} Performance Report")
-    pdf.setFont("Helvetica", 12)
-    pdf.drawString(200, 530, f"Academic Year: {academic_year}, Term: {term}")
-
-    # Draw a simple table (example, you can format it better)
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(50, 500, "School Performance Summary")
-    
-    y_position = 480
-    for term, score in eval(school_performance).items():
-        pdf.drawString(50, y_position, f"{term}: {score}%")
-        y_position -= 20
-
-    pdf.drawString(50, y_position - 20, "Departmental Performance")
-    y_position -= 40
-
-    for dept, data in eval(department_performance)["departments"].items():
-        pdf.drawString(50, y_position, f"Department: {dept}")
-        y_position -= 20
-        for class_group, subjects in data.items():
-            pdf.drawString(70, y_position, f"Class: {class_group}")
-            y_position -= 20
-            for subject, avg_score in subjects.items():
-                pdf.drawString(90, y_position, f"{subject}: {avg_score}%")
-                y_position -= 20
-        y_position -= 20
-
-    pdf.showPage()
-    pdf.save()
-
-    buffer.seek(0)
-    response.write(buffer.getvalue())
-    return response
-
+    return JsonResponse({"terms": terms, "academic_years": academic_years, "selected_academic_year": academic_year_str})
 
 
 @login_required
@@ -733,191 +611,334 @@ def get_departments(request):
 #-------------- PERFORMANCE ANALYSIS -------------------
 
 
-def school_performance(request):
-    return render(request, 'school/school_performance_analysis.html')
-
 def school_performance_analysis(request):
-    """Generates tabular performance trend data per class under each department."""
+    context = get_school_performance_context(request)
+    return render(request, 'school/school_performance_analysis.html', context)
+
+
+def get_school_performance_context(request):
+    """Generates school-wide performance analysis including departmental class performance."""
+    print("🔍 Starting school performance context generation...")
+
+    # Load filters
     filter_options = json.loads(get_available_terms(request).content)
-    academic_year = request.GET.get("academic_year")
+    academic_year = request.GET.get("academic_year", "").strip()
     selected_term = request.GET.get("term", "all")
-    school = request.user.school
 
-    terms = [t["name"] for t in filter_options["terms"]]
-    if selected_term != "all":
-        terms = [selected_term]  # If a specific term is selected, filter only that term
+    valid_years = [year["name"] for year in filter_options["academic_years"]]
+    academic_year = academic_year if academic_year in valid_years else filter_options["selected_academic_year"]
 
-    data = {}
+    all_terms = [t["name"] for t in filter_options["terms"]]
+    selected_term = selected_term if selected_term in all_terms else "Term 1"
 
-    for department in school.department.all():  # Assuming school has a related_name "department"
-        data[department.name] = {}
+    user = request.user
+    if not hasattr(user, 'school') or user.role != 'headteacher':
+        return redirect("homepage")
 
-        # ✅ Fix: Fetch class groups related to this department
-        for class_group in ClassGroup.objects.filter(department=department):
-            data[department.name][class_group.name] = {"subjects": [], "trend_data": {}, "term_averages": {}}
+    school = user.school
+    print("📥 Filters applied - Academic Year:", academic_year, "| Term:", selected_term)
 
-            subjects = StudentMark.objects.filter(
-                class_group=class_group,
-                academic_year=academic_year,
-                student__school=school
-            ).values_list("subject__name", flat=True).distinct()
+    selected_marks = StudentMark.objects.filter(
+        academic_year=academic_year,
+        term=selected_term,
+        student__school=school
+    ).select_related("subject", "student__class_group", "student")
 
-            data[department.name][class_group.name]["subjects"] = subjects
+    print("🧾 Total marks fetched:", selected_marks.count())
 
-            for term in terms:
-                data[department.name][class_group.name]["trend_data"][term] = {}
-                subject_totals = []
+    # ➕ Build Department → Subject → Class → [Marks]
+    dept_structure = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
 
-                for subject in subjects:
-                    marks = StudentMark.objects.filter(
-                        class_group=class_group,
-                        academic_year=academic_year,
-                        term=term,
-                        subject__name=subject,
-                        student__school=school
-                    ).aggregate(avg=Avg("mark"))
+    for mark in selected_marks:
+        subject = mark.subject
+        subject_name = subject.name
+        class_name = mark.student.class_group.name
+        for dept in subject.department.all():
+            dept_name = dept.name
+            dept_structure[dept_name][subject_name][class_name].append(float(mark.mark))
 
-                    avg_mark = round(marks["avg"], 2) if marks["avg"] else 0
-                    data[department.name][class_group.name]["trend_data"][term][subject] = avg_mark
+    # ✅ Fixed: Store each department inside the loop
+    departments = {}
+    subject_averages = {}
+    for dept_name, subjects in dept_structure.items():
+        all_class_names = set()
+        dept_subjects = {}
+        averages = {}
+        for subject_name, classes in subjects.items():
+            class_avgs = {}
+            all_scores = []
+            for class_name, scores in classes.items():
+                all_class_names.add(class_name)
+                avg = round(sum(scores) / len(scores), 2)
+                class_avgs[class_name] = avg
+                all_scores.extend(scores)
+            dept_subjects[subject_name] = class_avgs
+            averages[subject_name] = round(sum(all_scores) / len(all_scores), 2) if all_scores else 0.0
+        departments[dept_name] = {
+            "subjects": dept_subjects,
+            "all_classes": sorted(all_class_names)
+        }
+        subject_averages[dept_name] = averages
 
-                    if avg_mark > 0:
-                        subject_totals.append(avg_mark)
+    print("🏫 Departmental class performance computed.")
 
-                data[department.name][class_group.name]["term_averages"][term] = round(
-                    sum(subject_totals) / len(subject_totals), 2
-                ) if subject_totals else 0
+    # 📚 Subject-wide averages (for bucket analysis)
+    subjects = defaultdict(list)
+    for mark in selected_marks:
+        subjects[mark.subject.name].append(float(mark.mark))
+    for subject, marks in subjects.items():
+        subjects[subject] = round(sum(marks) / len(marks), 2) if marks else "-"
 
-            total_averages = {
-                subject: round(
-                    sum(data[department.name][class_group.name]["trend_data"][term].get(subject, 0) for term in terms) / len(terms), 2
-                ) for subject in subjects
-            }
+    # 🎯 Score buckets
+    all_scores = [score for score in subjects.values() if isinstance(score, (int, float))]
+    score_buckets = {
+        "80-100": sum(1 for s in all_scores if s >= 80),
+        "55-79": sum(1 for s in all_scores if 55 <= s < 80),
+        "50-54": sum(1 for s in all_scores if 50 <= s < 55),
+        "40-49": sum(1 for s in all_scores if 40 <= s < 50),
+        "0-39":  sum(1 for s in all_scores if s < 40),
+    }
 
-            overall_average = round(sum(total_averages.values()) / len(total_averages), 2) if total_averages else 0
+    # 📈 Term & Academic Trend
+    base_year = int(academic_year.split("/")[0])
+    prev_1 = f"{base_year - 1}/{base_year}"
+    prev_2 = f"{base_year - 2}/{base_year - 1}"
+    academic_years = [prev_2, prev_1, academic_year]
 
-            data[department.name][class_group.name]["total_averages"] = total_averages
-            data[department.name][class_group.name]["overall_average"] = overall_average
+    if selected_term == "Term 1":
+        term_sequence = [("Term 2", prev_1), ("Term 3", prev_1), ("Term 1", academic_year)]
+    elif selected_term == "Term 2":
+        term_sequence = [("Term 3", prev_1), ("Term 1", academic_year), ("Term 2", academic_year)]
+    else:
+        term_sequence = [("Term 1", academic_year), ("Term 2", academic_year), ("Term 3", academic_year)]
 
-    return render(request, "school/school_performance_analysis.html", {
-        "data": data,
-        "terms": terms,
-        "academic_years": filter_options["academic_years"],
+    term_keys = [f"{t} ({y})" for t, y in term_sequence]
+    q_terms = Q()
+    for term, year in term_sequence:
+        q_terms |= Q(term=term, academic_year=year)
+
+    trend_marks = StudentMark.objects.filter(student__school=school).filter(q_terms)
+
+    term_aggregates = {key: [] for key in term_keys}
+    year_aggregates = {year: [] for year in academic_years}
+
+    for mark in trend_marks:
+        score = float(mark.mark)
+        key = f"{mark.term} ({mark.academic_year})"
+        if key in term_aggregates:
+            term_aggregates[key].append(score)
+        if mark.academic_year in year_aggregates:
+            year_aggregates[mark.academic_year].append(score)
+
+    term_trend = {
+        "School": school.name,
+        **{key: round(sum(v) / len(v), 2) if v else "-" for key, v in term_aggregates.items()}
+    }
+    academic_trend = {
+        "School": school.name,
+        **{year: round(sum(v) / len(v), 2) if v else "-" for year, v in year_aggregates.items()}
+    }
+
+    term_labels = list(term_trend.keys())[1:]
+    term_values = [float(val) if isinstance(val, (int, float)) else None for val in list(term_trend.values())[1:]]
+    year_labels = list(academic_trend.keys())[1:]
+    year_values = [float(val) if isinstance(val, (int, float)) else None for val in list(academic_trend.values())[1:]]
+
+    print("✅ Finished generating full context.")
+
+    return {
+        "subjects": subjects,
+        "departments": departments,
+        "subject_averages": subject_averages,
+        "term_trend": term_trend,
+        "academic_trend": academic_trend,
+        "terms": all_terms,
+        "academic_years": valid_years,
         "selected_year": academic_year,
-        "selected_term": selected_term
-    })
+        "selected_term": selected_term,
 
-def generate_pdf(request):
-    """Generates a PDF for school performance analysis"""
+        "bucket_80_100": score_buckets["80-100"],
+        "bucket_55_79": score_buckets["55-79"],
+        "bucket_50_54": score_buckets["50-54"],
+        "bucket_40_49": score_buckets["40-49"],
+        "bucket_0_39": score_buckets["0-39"],
+        "score_buckets": score_buckets,
 
-    # 🛑 Get school name, term, and academic year
-    school_name = request.user.school.name  # Assuming user has a related school model
-    term = request.GET.get("term", "all")  # Match filtering
-    academic_year = request.GET.get("academic_year")
+        "term_chart": {"labels": term_labels, "data": term_values},
+        "year_chart": {"labels": year_labels, "data": year_values},
+    }
 
-    # 🛑 Fetch the same performance data
-    filter_options = json.loads(get_available_terms(request).content)
-    terms = [t["name"] for t in filter_options["terms"]]
-    if term != "all":
-        terms = [term]
 
-    school = request.user.school
-    data = {}
+@login_required
+def download_school_performance_pdf(request):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=120, bottomMargin=50)
+    elements = []
+    styles = getSampleStyleSheet()
+    subtitle_style = styles['Heading4']
 
-    for department in school.department.all():
-        data[department.name] = {}
+    context = get_school_performance_context(request)
+    year = context['selected_year']
+    term = context['selected_term']
+    departments = context["departments"]
+    score_buckets = context['score_buckets']
+    term_trend = context['term_trend']
+    academic_trend = context['academic_trend']
+    school_name = f"School: {request.user.school.name}"
 
-        for class_group in ClassGroup.objects.filter(department=department):
-            data[department.name][class_group.name] = {"subjects": [], "trend_data": {}, "term_averages": {}}
+    # --- Department-wise Tables + Charts ---
+    for dept, dept_data in departments.items():
+        elements.append(Paragraph(f"{dept}", subtitle_style))
+        table_data = [["Subject"] + dept_data["all_classes"]]
 
-            subjects = StudentMark.objects.filter(
-                class_group=class_group,
-                academic_year=academic_year,
-                student__school=school
-            ).values_list("subject__name", flat=True).distinct()
+        for subject, class_scores in dept_data["subjects"].items():
+            row = [subject] + [class_scores.get(cls, "-") for cls in dept_data["all_classes"]]
+            table_data.append(row)
 
-            data[department.name][class_group.name]["subjects"] = subjects
+        max_cols = len(dept_data["all_classes"]) + 1
+        col_widths = [100] + [(A4[0] - 120) / (max_cols - 1)] * (max_cols - 1)
 
-            for term in terms:
-                data[department.name][class_group.name]["trend_data"][term] = {}
-                subject_totals = []
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ]))
+        elements.extend([table, Spacer(1, 10)])
 
-                for subject in subjects:
-                    marks = StudentMark.objects.filter(
-                        class_group=class_group,
-                        academic_year=academic_year,
-                        term=term,
-                        subject__name=subject,
-                        student__school=school
-                    ).aggregate(avg=Avg("mark"))
+        subjects = list(dept_data["subjects"].keys())
+        class_names = dept_data["all_classes"]
+        data = []
+        for cls in class_names:
+            row = [dept_data["subjects"][subj].get(cls, 0) or 0 for subj in subjects]
+            data.append(row)
 
-                    avg_mark = round(marks["avg"], 2) if marks["avg"] else 0
-                    data[department.name][class_group.name]["trend_data"][term][subject] = avg_mark
+        if data and any(any(v > 0 for v in row) for row in data):
+            fig, ax = plt.subplots(figsize=(8, 4))
+            x = range(len(subjects))
+            width = 0.8 / len(data)
 
-                    if avg_mark > 0:
-                        subject_totals.append(avg_mark)
+            for i, row in enumerate(data):
+                offset = i * width
+                ax.bar([pos + offset for pos in x], row, width, label=class_names[i])
 
-                data[department.name][class_group.name]["term_averages"][term] = round(
-                    sum(subject_totals) / len(subject_totals), 2
-                ) if subject_totals else 0
+            ax.set_xticks([pos + width * (len(data)/2) for pos in x])
+            ax.set_xticklabels(subjects, rotation=45, ha='right')
+            ax.set_ylabel('Average Score')
+            ax.set_title(f"{dept} Class-wise Subject Performance")
+            ax.legend()
 
-            total_averages = {
-                subject: round(
-                    sum(data[department.name][class_group.name]["trend_data"][term].get(subject, 0) for term in terms) / len(terms), 2
-                ) for subject in subjects
-            }
+            img_buffer = io.BytesIO()
+            plt.tight_layout()
+            canvas = FigureCanvas(fig)
+            canvas.print_png(img_buffer)
+            plt.close(fig)
 
-            overall_average = round(sum(total_averages.values()) / len(total_averages), 2) if total_averages else 0
+            img_buffer.seek(0)
+            img = Image(img_buffer, width=480, height=240)
+            elements.extend([img, Spacer(1, 20)])
 
-            data[department.name][class_group.name]["total_averages"] = total_averages
-            data[department.name][class_group.name]["overall_average"] = overall_average
+    # --- Score Buckets ---
+    elements.append(Paragraph("Score Distribution Buckets", subtitle_style))
+    bucket_table_data = [
+        ["Score Range", "Number of Students"],
+        ["80-100", score_buckets["80-100"]],
+        ["55-79", score_buckets["55-79"]],
+        ["50-54", score_buckets["50-54"]],
+        ["40-49", score_buckets["40-49"]],
+        ["0-39", score_buckets["0-39"]],
+    ]
+    bucket_table = Table(bucket_table_data, colWidths=[120, 120])
+    bucket_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    ]))
+    elements.extend([bucket_table, Spacer(1, 20)])
 
-    # 🛑 Generate PDF
-    response = HttpResponse(content_type="application/pdf")
-    filename = f"{school_name}_Performance_{term}_{academic_year}.pdf".replace(" ", "_")
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    # ✅ FIXED — Trend Table Helpers
+    def wrap_labels_and_values(data_dict):
+        keys = list(data_dict.keys())
+        values = [str(v) for v in data_dict.values()]
+        return [keys, values]
 
-    p = canvas.Canvas(response, pagesize=A4)
-    width, height = A4
+    def get_fixed_col_widths(data_dict):
+        keys = list(data_dict.keys())
+        widths = []
+        for key in keys:
+            length = len(str(key))
+            width = 140 if "School" in str(key) else max(60, length * 6)
+            widths.append(width)
+        return widths
 
-    # 🛑 Title
-    p.setFont("Helvetica-Bold", 14)
-    p.drawCentredString(width / 2, height - 50, f"{school_name} Performance Report")
+    # --- Term Trend Table ---
+    elements.append(Paragraph("Termly Performance Trend", subtitle_style))
+    term_data = wrap_labels_and_values(term_trend)
+    term_col_widths = get_fixed_col_widths(term_trend)
+    term_table = Table(term_data, colWidths=term_col_widths)
+    term_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    ]))
+    elements.extend([term_table, Spacer(1, 20)])
 
-    # 🛑 Term & Academic Year
-    p.setFont("Helvetica", 12)
-    p.drawCentredString(width / 2, height - 80, f"Term: {term} | Academic Year: {academic_year}")
+    # --- Year Trend Table ---
+    elements.append(Paragraph("Academic Year Performance Trend", subtitle_style))
+    year_data = wrap_labels_and_values(academic_trend)
+    year_col_widths = get_fixed_col_widths(academic_trend)
+    year_table = Table(year_data, colWidths=year_col_widths)
+    year_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    ]))
+    elements.extend([year_table, Spacer(1, 20)])
 
-    # 🛑 Loop through departments, classes, and subjects
-    y_pos = height - 120
-    p.setFont("Helvetica-Bold", 12)
+    # --- Header/Footer ---
+    def draw_custom_header(c, school_name, academic_year, term):
+        page_width, page_height = A4
+        banner_color = colors.HexColor("#f2f2f2")
+        text_color = colors.black
 
-    for department, classes in data.items():
-        p.drawString(50, y_pos, f"{department} Department")
-        y_pos -= 20
+        c.setFillColor(banner_color)
+        c.rect(0, page_height - 60, page_width, 60, fill=1, stroke=0)
+        c.setFillColor(text_color)
+        c.setFont("Helvetica-Bold", 18)
+        c.drawCentredString(page_width / 2, page_height - 35, "School Performance Report")
 
-        for class_group, details in classes.items():
-            p.drawString(70, y_pos, f"Class: {class_group}")
-            y_pos -= 20
+        c.setFont("Helvetica", 12)
+        c.drawCentredString(page_width / 2, page_height - 52, school_name)
 
-            for term in terms:
-                p.drawString(90, y_pos, f"Term: {term}")
-                y_pos -= 20
+        c.setFillColor(banner_color)
+        c.rect(0, page_height - 85, page_width, 25, fill=1, stroke=0)
+        c.setFillColor(text_color)
+        c.setFont("Helvetica-Bold", 10)
+        info_text = f"Academic Year: {academic_year}    |    Term: {term}"
+        c.drawCentredString(page_width / 2, page_height - 70, info_text)
 
-                for subject, avg in details["trend_data"][term].items():
-                    p.drawString(110, y_pos, f"{subject}: {avg}%")
-                    y_pos -= 20
+    def draw_footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica', 9)
+        canvas.drawCentredString(A4[0] / 2, 30, f"Page {doc.page}")
+        canvas.restoreState()
 
-                p.drawString(110, y_pos, f"Term Avg: {details['term_averages'][term]}%")
-                y_pos -= 20
+    # --- Build PDF ---
+    doc.build(
+        elements,
+        onFirstPage=lambda c, d: [draw_custom_header(c, school_name, year, term), draw_footer(c, d)],
+        onLaterPages=draw_footer
+    )
 
-            p.drawString(90, y_pos, f"Overall Average: {details['overall_average']}%")
-            y_pos -= 30  # Extra space after class
+    buffer.seek(0)
+    safe_year = str(year).replace("/", "_")
+    filename = f"{school_name}_Performance_{safe_year}_{term}.pdf"
 
-        y_pos -= 30  # Extra space after department
-
-    p.showPage()
-    p.save()
+    response = HttpResponse(buffer, content_type="application/pdf")
+    response["Content-Disposition"] = f"attachment; filename={filename}"
     return response
+
 
 
 #------------------- Submit Results -----------------------

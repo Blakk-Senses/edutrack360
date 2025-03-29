@@ -1,16 +1,15 @@
 # myapp/urls.py
 from django.urls import path
 from core.views.view_school import (
-    class_management,teacher_management, submit_results, school_performance,
-    progress_trends, assign_teacher_to_subject, remove_teacher_from_subject, 
-    assign_teacher_to_class, remove_teacher_from_class, get_teacher_classes,
-    bulk_upload_teachers,download_teacher_template, save_last_page, 
+    class_management,teacher_management, submit_results, assign_teacher_to_subject, 
+    remove_teacher_from_subject, assign_teacher_to_class, remove_teacher_from_class, 
+    get_teacher_classes, bulk_upload_teachers,download_teacher_template, save_last_page, 
     get_last_page, manual_upload, get_classes_by_department, add_class_to_department,
     school_performance_analysis, get_available_terms, get_teachers,
-    get_subjects_by_department, get_departments, get_trend_data, get_performance_data,
-    get_school_performance, generate_pdf, generate_school_report_pdf, view_result,
+    get_subjects_by_department, get_departments,
+    school_performance_analysis, view_result,
     submit_result, query_result, add_subject_to_department, subject_management,
-    get_subjects_by_teacher,
+    get_subjects_by_teacher, download_school_performance_pdf,
     
 
 )
@@ -45,15 +44,9 @@ urlpatterns = [
     path('bulk_upload_teachers/', bulk_upload_teachers, name='bulk_upload_teachers'),
     path('download_teacher_template/<str:file_format>/', download_teacher_template, name='download_teacher_template'),
     
-    path('school_performance/', school_performance, name='school_performance'),
     path('performance_analysis/', school_performance_analysis, name='school_performance_analysis'),
-    path('download_report/', generate_pdf, name='download_report'),
+    path('performance/download/', download_school_performance_pdf, name='download_school_performance_pdf'),
 
-    path('progress_trends/', progress_trends, name='progress_trends'),
-    path('trend_data/', get_trend_data, name='get_trend_data' ),
-    path('performance/', get_school_performance, name='get_school_performance' ),
-    path('performance_data/', get_performance_data, name='get_performance_data' ),
-    path('download_trends_report/', generate_school_report_pdf, name='generate_school_report_pdf'),
 
     path('submit_results/', submit_results, name='submit_results'),
     path('view_results/<int:result_id>/', view_result, name='view_results'),

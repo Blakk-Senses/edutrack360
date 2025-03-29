@@ -57,136 +57,234 @@
             </a>
         </div>
     </nav>
-    
-    <div class="container mt-4">
-        <h3 class="text-center mb-4 fw-bold">🏫 {{ user.school }} Performance Analysis</h3>
-        <!-- Filters Section -->
-        <div class="card shadow-sm p-4 mb-4">
-            <form method="get" action="{% url 'school:school_performance_analysis' %}">
-                <div class="row g-3 mt-2">
-                    <div class="col-md-6">
-                        <label for="academic_year" class="form-label fw-semibold">Select Academic Year:</label>
-                        <select id="academic_year" name="academic_year" class="form-select border-primary">
+
+    <div class="container py-5">
+
+        <!-- 🔍 Filters -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h3 class="card-title mb-4 text-secondary">School Performance Analysis</h3>
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold">Academic Year</label>
+                        <select name="academic_year" class="form-select">
                             {% for year in academic_years %}
-                                <option value="{{ year.id }}" {% if year.id == selected_year %}selected{% endif %}>
-                                    {{ year.name }}
-                                </option>
+                                <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-6">
-                        <label for="term" class="form-label fw-semibold">Select Term:</label>
-                        <select id="term" name="term" class="form-select border-primary">
-                            <option value="all">All Terms</option>
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold">Term</label>
+                        <select name="term" class="form-select">
                             {% for term in terms %}
-                                <option value="{{ term }}" {% if term == selected_term %}selected{% endif %}>
-                                    {{ term }}
-                                </option>
+                                <option value="{{ term }}" {% if term == selected_term %}selected{% endif %}>{{ term }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                </div>
-                <div class="d-grid mt-3">
-                    <button type="submit" class="btn btn-primary fw-bold">Generate Report</button>
-                </div>
-            </form>
-        </div>
-        <!-- Departmental Performance Tables -->
-        {% for department, data in departmental_data.items %}
-        <div class="card shadow-sm p-4 mb-4">
-            <h4 class="text-center fw-bold">{{ department }}</h4>
-            <div class="table-responsive">
-                <table class="table table-bordered table-striped mt-3">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Subject</th>
-                            {% for class in data.classes %}
-                                <th>{{ class }}</th>
-                            {% endfor %}
-                            <th>Total Subject Avg</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for subject, values in data.subjects.items %}
-                        <tr>
-                            <td>{{ subject }}</td>
-                            {% for avg_score in values.scores %}
-                                <td>{{ avg_score|floatformat:2 }}</td>
-                            {% endfor %}
-                            <td><strong>{{ values.total_subject_avg|floatformat:2 }}</strong></td>
-                        </tr>
-                        {% endfor %}
-                        <tr class="table-info">
-                            <td><strong>Total Class Avg</strong></td>
-                            {% for avg in data.total_class_avg %}
-                                <td><strong>{{ avg|floatformat:2 }}</strong></td>
-                            {% endfor %}
-                            <td></td>
-                        </tr>
-                    </tbody>
-                </table>
+                    <div class="col-md-2">
+                        <button class="btn btn-outline-primary w-100">
+                            <i class="bi bi-filter"></i> Filter
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
+    
+        <!-- 📊 Department Performance Tables and Charts -->
+        {% for dept, dept_data in departments.items %}
+            <div class="card shadow-sm border-0 mb-5">
+                <div class="card-body">
+                    <h5 class="card-title text-secondary">{{ dept }}</h5>
+    
+                    {% with all_classes=dept_data.all_classes %}
+                    <table class="table table-bordered table-hover text-center mt-4">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Subject</th>
+                                {% for class_name in all_classes %}
+                                    <th>{{ class_name }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for subject, class_data in dept_data.subjects.items %}
+                                <tr>
+                                    <td class="fw-semibold text-start">{{ subject }}</td>
+                                    {% for class_name in all_classes %}
+                                        <td>{{ class_data|get_item:class_name|default:"-" }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endwith %}
+    
+                    <!-- 📊 Clustered Bar Chart -->
+                    <canvas id="barChart_{{ dept|slugify }}" height="120"></canvas>
+                    {% with dept_slug=dept|slugify %}
+                    {% with bar_data_id="bar-data-"|add:dept_slug %}
+                        {{ dept_data.subjects|json_script:bar_data_id }}
+                    {% endwith %}
+                    {% with bar_classes_id="bar-classes-"|add:dept_slug %}
+                        {{ dept_data.all_classes|json_script:bar_classes_id }}
+                    {% endwith %}
+                {% endwith %}
+            </div>
         {% endfor %}
-
-        <!-- Term Performance Comparison Table -->
-        <div class="card shadow-sm p-4 mt-4">
-            <h4 class="text-center fw-bold">📊 Term Performance Comparison</h4>
-            <div class="table-responsive">
-                <table class="table table-bordered table-striped mt-3">
-                    <thead class="table-dark">
+    
+        <!-- 📈 Term Trend -->
+        <div class="card shadow-sm border-0 mb-5">
+            <div class="card-body">
+                <h5 class="card-title text-secondary">Term Performance Trend</h5>
+                <table class="table table-bordered table-hover text-center mt-3">
+                    <thead class="table-light">
                         <tr>
-                            <th>Term</th>
-                            {% for term in term_performance.terms %}
-                                <th>{{ term }}</th>
+                            {% for key in term_trend.keys %}
+                                <th>{{ key }}</th>
                             {% endfor %}
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td><strong>School Average</strong></td>
-                            {% for avg in term_performance.averages %}
-                                <td>{{ avg|floatformat:2 }}</td>
+                            {% for val in term_trend.values %}
+                                <td>{{ val }}</td>
                             {% endfor %}
                         </tr>
                     </tbody>
                 </table>
+                <canvas id="termLineChart" height="100"></canvas>
             </div>
         </div>
-
-        <!-- Yearly Performance Comparison Table -->
-        <div class="card shadow-sm p-4 mt-4">
-            <h4 class="text-center fw-bold">📊 Yearly Performance Comparison</h4>
-            <div class="table-responsive">
-                <table class="table table-bordered table-striped mt-3">
-                    <thead class="table-dark">
+        {{ term_chart|json_script:"term-chart-data" }}
+    
+        <!-- 📆 Academic Year Trend -->
+        <div class="card shadow-sm border-0 mb-5">
+            <div class="card-body">
+                <h5 class="card-title text-secondary">Academic Year Trend</h5>
+                <table class="table table-bordered table-hover text-center mt-3">
+                    <thead class="table-light">
                         <tr>
-                            <th>Academic Year</th>
-                            {% for year in yearly_performance.years %}
-                                <th>{{ year }}</th>
+                            {% for key in academic_trend.keys %}
+                                <th>{{ key }}</th>
                             {% endfor %}
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td><strong>School Average</strong></td>
-                            {% for avg in yearly_performance.averages %}
-                                <td>{{ avg|floatformat:2 }}</td>
+                            {% for val in academic_trend.values %}
+                                <td>{{ val }}</td>
                             {% endfor %}
                         </tr>
                     </tbody>
                 </table>
+                <canvas id="yearLineChart" height="100"></canvas>
             </div>
         </div>
+        {{ year_chart|json_script:"year-chart-data" }}
 
-        <!-- PDF Download -->
-        <div class="d-grid mt-4">
-            <a href="{% url 'school:download_report' %}?academic_year={{ selected_year }}&term={{ selected_term }}" class="btn btn-success fw-bold">
-                📄 Download Report
+        <div class="shadow-sm border rounded px-4 py-3 mt-4">
+            <a href="{% url 'school:download_school_performance_pdf' %}?department={{ selected_department }}&class_group={{ selected_class_group }}&academic_year={{ selected_year }}&term={{ selected_term }}"
+            class="btn btn-outline-primary w-100">
+                ⬇️ Download PDF Report
             </a>
         </div>
+    
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 📊 Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const termChartData = JSON.parse(document.getElementById("term-chart-data")?.textContent || "null");
+            const yearChartData = JSON.parse(document.getElementById("year-chart-data")?.textContent || "null");
+    
+            if (termChartData) {
+                const ctx = document.getElementById('termLineChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: termChartData.labels,
+                        datasets: [{
+                            label: 'Average',
+                            data: termChartData.data,
+                            borderColor: '#0d6efd',
+                            backgroundColor: 'rgba(13,110,253,0.2)',
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+    
+            if (yearChartData) {
+                const ctx = document.getElementById('yearLineChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: yearChartData.labels,
+                        datasets: [{
+                            label: 'Average',
+                            data: yearChartData.data,
+                            borderColor: '#198754',
+                            backgroundColor: 'rgba(25,135,84,0.2)',
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+    
+            // 🎯 Clustered Bar Charts per Department
+            document.querySelectorAll("script[id^='bar-data-']").forEach(script => {
+                const deptKey = script.id.replace("bar-data-", "");
+                const data = JSON.parse(script.textContent);
+                const classes = JSON.parse(document.getElementById(`bar-classes-${deptKey}`).textContent);
+    
+                const subjects = Object.keys(data);
+                const datasets = classes.map((cls, i) => ({
+                    label: cls,
+                    data: subjects.map(subject => data[subject][cls] || 0),
+                    backgroundColor: `hsl(${(i * 60) % 360}, 70%, 60%)`
+                }));
+    
+                const ctx = document.getElementById(`barChart_${deptKey}`)?.getContext("2d");
+                if (ctx) {
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: subjects,
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                tooltip: { mode: 'index', intersect: false },
+                                title: {
+                                    display: true,
+                                    text: 'Class-wise Subject Performance'
+                                }
+                            },
+                            scales: {
+                                x: { stacked: false },
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { precision: 0 }
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+    
 </body>
 </html>
