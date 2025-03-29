@@ -127,7 +127,7 @@ body {
 /* Adjust main content margin */
 .main-content {
     margin-left: 110px; /* Adjusted for sidebar width */
-    margin-top: 70px; /* Adjusted for navbar height */
+    margin-top: 60px; /* Adjusted for navbar height */
     padding: 20px;
     height: calc(100vh - 70px);
     overflow-y: auto;
@@ -157,6 +157,10 @@ body {
     overflow: hidden;
     position: relative;
     z-index: 100; /* Ensure tooltips go over cards */
+}
+
+.dashboard-header{
+    margin-bottom: 10px;
 }
 
 .custom-card .card-header {

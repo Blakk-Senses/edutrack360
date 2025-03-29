@@ -37,6 +37,10 @@
             <i class="fas fa-chart-bar"></i>
             <span class="tooltip">Class Performance Analysis</span>
         </a>
+        <a href="{% url 'teacher:view_uploaded_files' %}">
+            <i class="fas fa-folder-open"></i>
+            <span class="tooltip">Result Management</span>
+        </a>
         <a href="{% url 'teacher:settings' %}">
             <i class="fas fa-cog"></i>
             <span class="tooltip">Settings</span>
@@ -48,7 +52,7 @@
     </div>
     <div class="main-content">
         <div class="container mt-4">
-            <!-- Filters Row -->
+            <!-- Filters -->
             <div class="row g-3 mb-4 align-items-end">
                 <div class="col-md-6">
                     <label for="yearFilter" class="form-label">Academic Year</label>
@@ -58,7 +62,6 @@
                         {% endfor %}
                     </select>
                 </div>
-    
                 <div class="col-md-6">
                     <label for="termFilter" class="form-label">Term</label>
                     <select id="termFilter" class="form-control">
@@ -69,7 +72,9 @@
                 </div>
             </div>
     
+            <!-- Dashboard Metrics -->
             <div class="row g-3">
+                <!-- Total Students -->
                 <div class="col-md-6">
                     <div class="dashboard-card total-students-assessed">
                         <div>
@@ -79,178 +84,170 @@
                         <div class="icon"><i class="fas fa-users"></i></div>
                     </div>
                 </div>
-            
+    
+                <!-- School Avg -->
                 <div class="col-md-6">
-                    <div class="dashboard-card average-class-performance">
+                    <div class="dashboard-card average-school-performance">
                         <div>
-                            <h3>Average Class Performance (%)</h3>
+                            <h3>Average School Performance</h3>
                             <p class="value">0%</p>
                         </div>
                         <div class="icon"><i class="fas fa-chart-line"></i></div>
                     </div>
                 </div>
-            
+    
+                <!-- Total Teachers -->
                 <div class="col-md-6">
-                    <div class="dashboard-card best-performing-students">
+                    <div class="dashboard-card total-teachers">
                         <div>
-                            <h3>Best Performing Students</h3>
+                            <h3>Total Teachers in the School</h3>
+                            <p class="value">0</p>
+                        </div>
+                        <div class="icon"><i class="fas fa-chalkboard-teacher"></i></div>
+                    </div>
+                </div>
+    
+                <!-- Best Subjects -->
+                <div class="col-md-6">
+                    <div class="dashboard-card best-performing-subjects">
+                        <div>
+                            <h3>Top 2 Performing Subjects</h3>
                             <ul class="value"></ul>
                         </div>
                         <div class="icon"><i class="fas fa-trophy"></i></div>
                     </div>
                 </div>
-
+    
+                <!-- Weakest Subjects -->
                 <div class="col-md-6">
-                    <div class="dashboard-card weakest-performing-students">
+                    <div class="dashboard-card weakest-performing-subjects">
                         <div>
-                            <h3>Weakest Performing Students</h3>
+                            <h3>Weakest 2 Subjects</h3>
                             <ul class="value"></ul>
                         </div>
                         <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
                     </div>
                 </div>
-
+    
+                <!-- Best Classes -->
                 <div class="col-md-6">
-                    <div class="dashboard-card top-performing-subject">
+                    <div class="dashboard-card best-performing-classes">
                         <div>
-                            <h3>Top Performing Subject</h3>
-                            <p class="value">-</p>
+                            <h3>Top 3 Performing Classes</h3>
+                            <ul class="value"></ul>
                         </div>
-                        <div class="icon"><i class="fas fa-arrow-up"></i></div>
+                        <div class="icon"><i class="fas fa-star"></i></div>
                     </div>
                 </div>
-
-                <div class="col-md-6">
-                    <div class="dashboard-card bottom-performing-subject">
-                        <div>
-                            <h3>Bottom Performing Subject</h3>
-                            <p class="value">-</p>
+    
+                <!-- Performance Trend Chart -->
+                <div class="col-md-12">
+                    <div class="custom-card">
+                        <div class="card-header">School Performance Trends</div>
+                        <div class="card-body">
+                            <canvas id="performanceTrendsChart"></canvas>
                         </div>
-                        <div class="icon"><i class="fas fa-arrow-down"></i></div>
                     </div>
                 </div>
-            </div>
-                <!-- Subject Performance Trends Chart -->
-            <div class="col-md-12">
-                <div class="custom-card">
-                    <div class="card-header">Class Performance Trends</div>
-                    <div class="card-body">
-                        <canvas id="performanceTrendsChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-                <!-- Upcoming Deadlines & Reminders -->
-            <div class="col-md-12">
-                <div class="custom-card">
-                    <div class="card-header">Upcoming Deadlines & Reminders</div>
-                    <div class="card-body">
-                        <p>No upcoming deadlines.</p>
+    
+                <!-- Notifications -->
+                <div class="col-md-12">
+                    <div class="custom-card">
+                        <div class="card-header">Recent Uploads</div>
+                        <div class="card-body">
+                            <ul class="recent-uploads value">
+                                <li>Loading...</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    
+    <!-- JS -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        function formatMark(mark) {
-            return mark !== null && !isNaN(mark) ? parseFloat(mark).toFixed(2) + "%" : "N/A";
+        function formatPercent(value) {
+            return value !== null && !isNaN(value) ? parseFloat(value).toFixed(2) + "%" : "N/A";
         }
-
-        function fetchDashboardData() {
-            let academic_year = $("#yearFilter").val();
-            let term = $("#termFilter").val();
-
+    
+        function fetchHeadteacherDashboardData() {
+            const academic_year = $("#yearFilter").val();
+            const term = $("#termFilter").val();
+    
             $.ajax({
-                url: "{% url 'dashboards:class_teacher_dashboard' %}",
-                type: "GET",
+                url: "{% url 'dashboards:headteacher_dashboard' %}",
                 data: { academic_year, term },
                 headers: { "X-Requested-With": "XMLHttpRequest" },
                 success: function (data) {
-                    console.log("Dashboard data:", data);
-
-                    // Total Students and Avg Performance
                     $(".total-students-assessed .value").text(data.total_students_assessed || 0);
-                    $(".average-class-performance .value").text(formatMark(data.average_class_performance));
-
-                    // Best Performing Students
-                    let bestStudents = data.best_students || [];
-                    let bestStudentsHtml = bestStudents.length
-                        ? bestStudents.map(s => `<li>${s.name} - ${formatMark(s.mark)}</li>`).join("")
-                        : "<li>No data</li>";
-                    $(".best-performing-students .value").html(bestStudentsHtml);
-
-                    // Weakest Performing Students
-                    let weakestStudents = data.weakest_students || [];
-                    let weakestStudentsHtml = weakestStudents.length
-                        ? weakestStudents.map(s => `<li>${s.name} - ${formatMark(s.mark)}</li>`).join("")
-                        : "<li>No data</li>";
-                    $(".weakest-performing-students .value").html(weakestStudentsHtml);
-
-                    // Top Performing Subject
-                    let topSubject = data.top_performing_subject;
-                    $(".top-performing-subject .value").text(
-                        topSubject && topSubject.subject__name
-                            ? `${topSubject.subject__name} (${formatMark(topSubject.avg_mark)})`
-                            : "No data"
-                    );
-
-                    // Bottom Performing Subject
-                    let bottomSubject = data.bottom_performing_subject;
-                    $(".bottom-performing-subject .value").text(
-                        bottomSubject && bottomSubject.subject__name
-                            ? `${bottomSubject.subject__name} (${formatMark(bottomSubject.avg_mark)})`
-                            : "No data"
-                    );
-
-                    // Update Chart
-                    updatePerformanceTrendsChart(data.performance_trends || []);
-                },
-                error: function (xhr) {
-                    console.error("Error fetching dashboard data:", xhr);
+                    $(".average-school-performance .value").text(formatPercent(data.total_school_average));
+                    $(".total-teachers .value").text(data.total_teachers || 0);
+    
+                    // Best Subjects
+                    let bestHtml = data.best_performing_subjects.length
+                        ? data.best_performing_subjects.map(s => `<li>${s.subject} (${formatPercent(s.average_score)})</li>`).join("")
+                        : "<li>No data available</li>";
+                    $(".best-performing-subjects .value").html(bestHtml);
+    
+                    // Weakest Subjects
+                    let weakHtml = data.worst_performing_subjects.length
+                        ? data.worst_performing_subjects.map(s => `<li>${s.subject} (${formatPercent(s.average_score)})</li>`).join("")
+                        : "<li>No data available</li>";
+                    $(".weakest-performing-subjects .value").html(weakHtml);
+    
+                    // Best Classes
+                    let classHtml = data.best_performing_classes.length
+                        ? data.best_performing_classes.map(c => `<li>${c.class_name} (${formatPercent(c.average_score)})</li>`).join("")
+                        : "<li>No data available</li>";
+                    $(".best-performing-classes .value").html(classHtml);
+    
+                    // Uploads
+                    let notifHtml = data.notifications.length
+                        ? data.notifications.map(n => `<li>${n}</li>`).join("")
+                        : "<li>No recent uploads</li>";
+                    $(".recent-uploads").html(notifHtml);
+    
+                    // Chart
+                    updateTrendChart(data.performance_trends);
                 }
             });
         }
-
-        $("#yearFilter, #termFilter").change(fetchDashboardData);
-        $(document).ready(fetchDashboardData);
-
-        // Chart.js initialization
-        let ctx = document.getElementById("performanceTrendsChart").getContext("2d");
-        let trendsChart = new Chart(ctx, {
+    
+        // Chart Init
+        const ctx = document.getElementById("performanceTrendsChart").getContext("2d");
+        const trendChart = new Chart(ctx, {
             type: "line",
             data: {
                 labels: [],
                 datasets: [{
-                    label: "Average Mark",
+                    label: "Performance Trend",
                     data: [],
                     borderColor: "blue",
-                    backgroundColor: "rgba(0, 0, 255, 0.2)",
-                    fill: true
+                    fill: false
                 }]
             },
             options: {
                 responsive: true,
-                animation: { duration: 0 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100
-                    }
-                }
+                scales: { y: { beginAtZero: true, max: 100 } }
             }
         });
-
-        function updatePerformanceTrendsChart(trendsData) {
-            let labels = trendsData.map(d => d.term);
-            let data = trendsData.map(d => (typeof d.avg_mark === "number" ? d.avg_mark : null));
-
-            trendsChart.data.labels = labels;
-            trendsChart.data.datasets[0].data = data;
-            trendsChart.update('none');
+    
+        function updateTrendChart(trendData) {
+            const labels = trendData.map(e => e.term);
+            const scores = trendData.map(e => e.score);
+            trendChart.data.labels = labels;
+            trendChart.data.datasets[0].data = scores;
+            trendChart.update();
         }
+    
+        // Trigger on filter change
+        $("#yearFilter, #termFilter").on("change", fetchHeadteacherDashboardData);
+        $(document).ready(fetchHeadteacherDashboardData);
     </script>
+    
 
     
 </body>

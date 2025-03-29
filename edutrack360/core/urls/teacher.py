@@ -6,8 +6,8 @@ from core.views.view_teacher import (
     manual_upload_result, bulk_upload_results, download_result_template,
     get_classes, get_class_department, download_subject_analysis_pdf,
     class_performance_analysis, download_class_performance_pdf,
-    upload_class_results, upload_subject_results, result_management,
-    view_result_file, confirm_result_file, delete_result_file,
+    upload_class_results, upload_subject_results, view_uploaded_files,
+    delete_result_entry, delete_result_file, view_result_entries
     
 )
 
@@ -41,11 +41,11 @@ urlpatterns = [
     path("class-performance-analysis/", class_performance_analysis, name="class_performance_analysis"),
     path("class-performance/download/", download_class_performance_pdf, name="download_class_performance_pdf"),
 
-    path('manage-results/', result_management, name='result_management'),
-    # urls.py
-    path('view/<str:academic_year>/<str:term>/<int:class_id>/<int:subject_id>/', view_result_file, name='view_result_file'),
-    path('confirm/<str:academic_year>/<str:term>/<int:class_id>/<int:subject_id>/', confirm_result_file, name='confirm_result_file'),
-    path('delete/<str:academic_year>/<str:term>/<int:class_id>/<int:subject_id>/', delete_result_file, name='delete_result_file'),
+    path("files/", view_uploaded_files, name="view_uploaded_files"),
+    path("files/<int:year>/<slug:term>/<int:subject_id>/<int:class_id>/delete/", delete_result_file, name="delete_result_file"),
+    path("entry/<int:result_id>/delete/", delete_result_entry, name="delete_result_entry"),
+    path("files/<slug:year>/<slug:term>/<int:subject_id>/<int:class_id>/view/", view_result_entries, name="view_result_entries"),
+
 
 
 ]

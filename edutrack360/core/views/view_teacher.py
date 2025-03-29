@@ -8,9 +8,12 @@ from django.core.files.storage import default_storage
 from django.contrib import messages
 import json
 import io
+from django.utils.text import slugify
+from django.core.paginator import Paginator
 from decimal import Decimal
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Max
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_http_methods
 from core.forms import ResultUploadForm 
 from core.models import (
     Subject, Student, StudentMark, SubjectTeacher, ClassGroup,
@@ -1117,185 +1120,112 @@ def download_result_template(request):
 
 #------------------ RESULT MANAGEMENT -------------------
 
+from django.utils.text import slugify  # make sure this is imported
+from django.core.paginator import Paginator
+from django.contrib.auth.decorators import login_required
+from django.db.models import Count, Max
+from django.shortcuts import render
 
 @login_required
-def result_management(request):
-    user = request.user
-    teacher = getattr(user, "teacher_profile", None)
+def view_uploaded_files(request):
+    teacher = request.user
 
-    if not teacher:
-        return render(request, "results/no_access.html")
-
-    result_qs = Result.objects.none()
-
-    class_teacher_qs = ClassTeacher.objects.filter(teacher=teacher)
-    if class_teacher_qs.exists():
-        assigned_class = class_teacher_qs.first().assigned_class
-        result_qs = Result.objects.filter(class_group=assigned_class)
-    else:
-        subject_teacher_qs = SubjectTeacher.objects.filter(teacher=teacher)
-        if subject_teacher_qs.exists():
-            filters = Q()
-            for st in subject_teacher_qs:
-                filters |= Q(subject=st.subject, class_group__in=st.assigned_classes.all(), teacher=user)
-            result_qs = Result.objects.filter(filters)
-
-    if not result_qs.exists():
-        return render(request, "results/no_access.html")
-
-    grouped_files = (
-        result_qs
-        .values("academic_year", "term", "class_group", "subject")
-        .annotate(
-            total=Count("id"),
-            confirmed=Count("id", filter=Q(status="Submitted"))
+    files_qs = (
+        Result.objects
+        .filter(teacher=teacher)
+        .values(
+            "academic_year",
+            "term",
+            "subject__id",
+            "subject__name",
+            "class_group__id",
+            "class_group__name"
         )
+        .annotate(
+            total_entries=Count("id"),
+            latest_upload=Max("submitted_at")
+        )
+        .order_by("-latest_upload")
     )
 
-    result_files = []
-    for group in grouped_files:
-        status = "Submitted" if group["total"] == group["confirmed"] else "Pending"
-        class_group = ClassGroup.objects.get(id=group["class_group"])
-        subject = Subject.objects.get(id=group["subject"])
+    # Convert into a list of enriched dictionaries to include slugs
+    files = []
+    for f in files_qs:
+        academic_year = f["academic_year"]
+        term = f["term"]
+        f["year_slug"] = academic_year.replace("/", "-") if academic_year else ""
+        f["term_slug"] = slugify(term) if term else ""
+        files.append(f)
 
-        result_files.append({
-            "academic_year": group["academic_year"],
-            "term": group["term"],
-            "class_group_id": class_group.id,
-            "class_group_name": class_group.name,
-            "subject_id": subject.id,
-            "subject_name": subject.name,
-            "status": status,
-            "total_students": group["total"],
-        })
-
-    paginator = Paginator(result_files, 10)
+    # Paginate enriched list
+    paginator = Paginator(files, 10)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    return render(request, "teacher/result_management.html", {
-        "page_obj": page_obj
-    })
+    return render(request, "teacher/result_management.html", {"page_obj": page_obj})
+
 
 
 @login_required
-def view_result_file(request, academic_year, term, class_group_id, subject_id):
-    user = request.user
-    teacher = getattr(user, "teacher_profile", None)
-    if not teacher:
-        return HttpResponseForbidden("Access denied.")
+def view_result_entries(request, year, term, subject_id, class_id):
+    teacher = request.user
 
-    class_group = get_object_or_404(ClassGroup, id=class_group_id)
-    subject = get_object_or_404(Subject, id=subject_id)
+    # Restore original format from slugified URL
+    year = str(year).replace('-', '/')
+    term = term.replace('-', ' ').title()
 
-    if ClassTeacher.objects.filter(teacher=teacher, assigned_class=class_group).exists():
-        results = Result.objects.filter(
-            academic_year=academic_year,
-            term=term,
-            class_group=class_group,
-            subject=subject
-        )
-    elif SubjectTeacher.objects.filter(
+    results = Result.objects.filter(
         teacher=teacher,
-        subject=subject,
-        assigned_classes=class_group
-    ).exists():
-        results = Result.objects.filter(
-            academic_year=academic_year,
-            term=term,
-            class_group=class_group,
-            subject=subject,
-            teacher=request.user
-        )
-    else:
-        return HttpResponseForbidden("Unauthorized access.")
+        academic_year=year,
+        term=term,
+        subject_id=subject_id,
+        class_group_id=class_id
+    ).select_related("student", "subject", "class_group")
 
-    return render(request, "teacher/view_result_file.html", {
+    if not results.exists():
+        return render(request, "teacher/view_result.html", {
+            "results": [],
+            "subject": None,
+            "class_group": None,
+            "year": year,
+            "term": term
+        })
+
+    subject = results[0].subject
+    class_group = results[0].class_group
+
+    return render(request, "teacher/view_result.html", {
         "results": results,
-        "class_group": class_group,
         "subject": subject,
-        "academic_year": academic_year,
-        "term": term,
+        "class_group": class_group,
+        "year": year,
+        "term": term
     })
 
 
+@require_http_methods(["DELETE"])
 @login_required
-@require_POST
-def confirm_result_file(request):
-    academic_year = request.POST.get("academic_year")
-    term = request.POST.get("term")
-    class_group_id = request.POST.get("class_group_id")
-    subject_id = request.POST.get("subject_id")
+def delete_result_file(request, year, term, subject_id, class_id):
+    teacher = request.user
 
-    teacher = getattr(request.user, "teacher_profile", None)
-    if not teacher:
-        return JsonResponse({"error": "Access denied"}, status=403)
+    year = year.replace('-', '/')
+    term = term.replace('-', ' ').title()
 
-    class_group = get_object_or_404(ClassGroup, id=class_group_id)
-    subject = get_object_or_404(Subject, id=subject_id)
-
-    if ClassTeacher.objects.filter(teacher=teacher, assigned_class=class_group).exists():
-        result_qs = Result.objects.filter(
-            academic_year=academic_year,
-            term=term,
-            class_group=class_group,
-            subject=subject
-        )
-    elif SubjectTeacher.objects.filter(
+    qs = Result.objects.filter(
         teacher=teacher,
-        subject=subject,
-        assigned_classes=class_group
-    ).exists():
-        result_qs = Result.objects.filter(
-            academic_year=academic_year,
-            term=term,
-            class_group=class_group,
-            subject=subject,
-            teacher=request.user
-        )
-    else:
-        return JsonResponse({"error": "Unauthorized"}, status=403)
-
-    updated = result_qs.update(status="Submitted")
-    return JsonResponse({"message": f"{updated} result(s) confirmed."}, status=200)
+        academic_year=year,
+        term=term,
+        subject_id=subject_id,
+        class_group_id=class_id
+    )
+    count, _ = qs.delete()
+    return JsonResponse({"message": f"Deleted {count} result(s)."}) 
 
 
+@require_http_methods(["DELETE"])
 @login_required
-@require_POST
-def delete_result_file(request):
-    academic_year = request.POST.get("academic_year")
-    term = request.POST.get("term")
-    class_group_id = request.POST.get("class_group_id")
-    subject_id = request.POST.get("subject_id")
-
-    teacher = getattr(request.user, "teacher_profile", None)
-    if not teacher:
-        return JsonResponse({"error": "Access denied"}, status=403)
-
-    class_group = get_object_or_404(ClassGroup, id=class_group_id)
-    subject = get_object_or_404(Subject, id=subject_id)
-
-    if ClassTeacher.objects.filter(teacher=teacher, assigned_class=class_group).exists():
-        result_qs = Result.objects.filter(
-            academic_year=academic_year,
-            term=term,
-            class_group=class_group,
-            subject=subject
-        )
-    elif SubjectTeacher.objects.filter(
-        teacher=teacher,
-        subject=subject,
-        assigned_classes=class_group
-    ).exists():
-        result_qs = Result.objects.filter(
-            academic_year=academic_year,
-            term=term,
-            class_group=class_group,
-            subject=subject,
-            teacher=request.user
-        )
-    else:
-        return JsonResponse({"error": "Unauthorized"}, status=403)
-
-    deleted, _ = result_qs.delete()
-    return JsonResponse({"message": f"{deleted} result(s) deleted permanently."}, status=200)
+def delete_result_entry(request, result_id):
+    teacher = request.user
+    result = get_object_or_404(Result, id=result_id, teacher=teacher)
+    result.delete()
+    return JsonResponse({"message": "Entry deleted."})

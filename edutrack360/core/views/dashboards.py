@@ -200,110 +200,123 @@ def download_circuit_report(request, circuit_id):
 
 #--------------- HEADTEACHER DASHBOARD -----------------
 
+@login_required
 def headteacher_dashboard(request):
-    # Get the current school from the logged-in user
-    school = request.user.school
+    user = request.user
+    if not hasattr(user, 'school'):
+        return redirect("homepage")
 
-    # Get the latest academic year from available student marks
-    current_academic_year = (
-        StudentMark.objects.filter(student__school=school)
-        .aggregate(latest_year=Max("academic_year"))["latest_year"]
-    )
+    school = user.school
 
-    # Get the latest term within the current academic year
-    current_term = (
-        StudentMark.objects.filter(student__school=school, academic_year=current_academic_year)
-        .aggregate(latest_term=Max("term"))["latest_term"]
-    )
+    # 🎯 Use shared helper for filter options
+    filter_options = json.loads(get_available_terms(request).content)
+    available_years = [year["name"] for year in filter_options.get("academic_years", [])]
+    available_terms = [term["name"] for term in filter_options.get("terms", [])]
 
-    # Ensure term and academic year exist
-    if not current_academic_year or not current_term:
+    # 🎯 Extract selected year/term with fallback
+    academic_year = request.GET.get("academic_year")
+    selected_year = academic_year if academic_year in available_years else filter_options.get("selected_academic_year")
+
+    term = request.GET.get("term")
+    selected_term = term if term in available_terms else filter_options.get("selected_term", "Term 1")
+
+    if not selected_year or not selected_term:
+        error_msg = "No academic data available."
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"error": error_msg})
         return render(request, "dashboards/headteacher_dashboard.html", {
-            "error": "No data available yet for this academic year."
+            "error": error_msg,
+            "available_years": available_years,
+            "available_terms": available_terms,
         })
 
-    # ✅ Total Students Assessed (Distinct Count of Students)
-    total_students_assessed = (
-        StudentMark.objects.filter(
-            student__school=school,
-            term=current_term,
-            academic_year=current_academic_year
-        ).values("student").distinct().count()
+    # 🎯 Filter marks school-wide by selected filters
+    marks_qs = StudentMark.objects.filter(
+        student__school=school,
+        academic_year=selected_year,
+        term=selected_term
     )
 
-    # ✅ Total School Average
-    total_school_average = (
-        StudentMark.objects.filter(
-            student__school=school,
-            term=current_term,
-            academic_year=current_academic_year
-        ).aggregate(Avg("mark"))["mark__avg"] or 0
+    total_students_assessed = marks_qs.values("student").distinct().count()
+    total_school_average = marks_qs.aggregate(avg=Avg("mark"))["avg"] or 0
+    total_teachers = school.teachers.count()
+
+    best_performing_subjects = list(
+        marks_qs.values("subject__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("-avg_mark")[:2]
     )
 
-    # ✅ Best & Worst Performing Subjects
-    subject_averages = (
-        StudentMark.objects.filter(
-            student__school=school,
-            term=current_term,
-            academic_year=current_academic_year
-        )
-        .values("subject__name", "subject__department__name")
+    weakest_performing_subjects = list(
+        marks_qs.values("subject__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("avg_mark")[:2]
+    )
+
+    best_performing_classes = list(
+        marks_qs.values("class_group__name")
         .annotate(avg_mark=Avg("mark"))
         .order_by("-avg_mark")[:3]
     )
 
-    best_performing_subjects = subject_averages[:2]
-    worst_performing_subjects = subject_averages[:2]
-
-    # ✅ Best 3 Performing Classes
-    class_averages = (
-        StudentMark.objects.filter(
-            student__school=school,
-            term=current_term,
-            academic_year=current_academic_year
-        )
-        .values("class_group__name")
+    class_performance_trends = (
+        marks_qs.values("class_group__name")
         .annotate(avg_mark=Avg("mark"))
-        .order_by("-avg_mark")[:3]
+        .order_by("class_group__name")
     )
 
-    best_performing_classes = class_averages[:3]
+    trend_data = [
+        {"class_name": entry["class_group__name"], "score": float(entry["avg_mark"])}
+        for entry in class_performance_trends
+    ]
 
-    # ✅ School Performance Trends (Data for Chart.js)
-    performance_trends = (
-        StudentMark.objects.filter(student__school=school)
-        .values("academic_year", "term")
-        .annotate(avg_mark=Avg("mark"))
-        .order_by("academic_year", "term")
-    )
-
-    trend_data = {
-        "dates": [f"{entry['academic_year']} T{entry['term']}" for entry in performance_trends],
-        "scores": [entry["avg_mark"] for entry in performance_trends],
-    }
-
-    # ✅ Notifications (Recent Uploads)
-    notifications = (
+    result_uploads = (
         Result.objects.filter(
-            student__school=school,
-            term=current_term,
-            academic_year=current_academic_year
+            school=school,
+            academic_year=selected_year,
+            term=selected_term
         )
-        .values("teacher__last_name", "subject__name", "student__class_group__name")
+        .select_related("teacher", "subject", "class_group")
         .order_by("-id")[:10]
     )
 
-    context = {
+    notifications = [
+        f"{upload.teacher.first_name} {upload.teacher.last_name} uploaded {upload.subject.name} for {upload.class_group.name}"
+        for upload in result_uploads
+    ]
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({
+            "total_students_assessed": total_students_assessed,
+            "total_school_average": round(total_school_average, 2),
+            "total_teachers": total_teachers,
+            "best_performing_subjects": [
+                {"subject": s["subject__name"], "average_score": float(s["avg_mark"])} for s in best_performing_subjects
+            ],
+            "worst_performing_subjects": [
+                {"subject": s["subject__name"], "average_score": float(s["avg_mark"])} for s in weakest_performing_subjects
+            ],
+            "best_performing_classes": [
+                {"class_name": c["class_group__name"], "average_score": float(c["avg_mark"])} for c in best_performing_classes
+            ],
+            "performance_trends": trend_data,
+            "notifications": notifications,
+        })
+
+    return render(request, "dashboards/headteacher_dashboard.html", {
+        "academic_years": available_years,
+        "terms": available_terms,
+        "selected_year": selected_year,
+        "selected_term": selected_term,
         "total_students_assessed": total_students_assessed,
         "total_school_average": round(total_school_average, 2),
+        "total_teachers": total_teachers,
         "best_performing_subjects": best_performing_subjects,
-        "worst_performing_subjects": worst_performing_subjects,
+        "weakest_performing_subjects": weakest_performing_subjects,
         "best_performing_classes": best_performing_classes,
         "performance_trends": trend_data,
         "notifications": notifications,
-    }
-
-    return render(request, "dashboards/headteacher_dashboard.html", context)
+    })
 
 
 #------------ TEACHER DASHBOARDS -----------------------
