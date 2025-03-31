@@ -1,0 +1,177 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Results Table</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        .table th, .table td { vertical-align: middle; text-align: center; }
+        .modal-header { background-color: #007bff; color: white; }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            background-color: #e0f7fa;
+            padding-top: 80px;
+        }
+
+        .navbar {
+            background-color: #003a3b;
+            color: white;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            padding: 10px 20px;
+        }
+
+        .logo-img {
+            max-width: 120px;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid d-flex justify-content-between">
+            <a href="{% url 'dashboards:headteacher_dashboard' %}">
+                <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <h2 class="mb-4">Uploaded Result Files</h2>
+
+        <table class="table table-bordered table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Academic Year</th>
+                    <th>Term</th>
+                    <th>Class</th>
+                    <th>Subject</th>
+                    <th>Latest Upload</th>
+                    <th>Status</th>
+                    <th style="min-width: 220px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in page_obj %}
+                <tr>
+                    <td>{{ file.academic_year }}</td>
+                    <td>{{ file.term }}</td>
+                    <td>{{ file.class_group__name }}</td>
+                    <td>{{ file.subject__name }}</td>
+                    <td>{{ file.latest_upload|date:"d M Y H:i" }}</td>
+                    <td>
+                        {% if file.status == "Submitted" %}
+                            <span class="badge bg-success">{{ file.status }}</span>
+                        {% elif file.status == "Queried" %}
+                            <span class="badge bg-danger">{{ file.status }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ file.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if file.status != "Queried" %}
+                            <a href="{% url 'school:headteacher_view_result' file.year_slug file.term_slug file.subject__id file.class_group__id %}"
+                               class="btn btn-sm btn-outline-primary">View</a>
+                        {% else %}
+                            <button class="btn btn-sm btn-outline-secondary" disabled>View</button>
+                        {% endif %}
+
+                        {% if file.status == "Pending" %}
+                            <form action="{% url 'school:submit_result' %}" method="POST" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="year" value="{{ file.year_slug }}">
+                                <input type="hidden" name="term" value="{{ file.term_slug }}">
+                                <input type="hidden" name="subject_id" value="{{ file.subject__id }}">
+                                <input type="hidden" name="class_id" value="{{ file.class_group__id }}">
+                                <button type="submit" class="btn btn-sm btn-success">Submit</button>
+                            </form>
+
+                            <button type="button"
+                                    class="btn btn-sm btn-warning"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#queryModal"
+                                    onclick="setQueryData('{{ file.year_slug }}', '{{ file.term_slug }}', '{{ file.subject__id }}', '{{ file.class_group__id }}')">
+                                Query
+                            </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Pagination -->
+        <nav>
+            <ul class="pagination">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                    </li>
+                {% endif %}
+                <li class="page-item disabled">
+                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                </li>
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+
+    <!-- Query Modal -->
+    <div class="modal fade" id="queryModal" tabindex="-1" aria-labelledby="queryModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="{% url 'school:query_result' %}" method="POST">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="queryModalLabel">Query Result Submission</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <input type="hidden" name="year" id="queryYear">
+                        <input type="hidden" name="term" id="queryTerm">
+                        <input type="hidden" name="subject_id" id="querySubjectId">
+                        <input type="hidden" name="class_id" id="queryClassId">
+
+                        <div class="mb-3">
+                            <label for="reason" class="form-label">Reason for Query</label>
+                            <textarea name="reason" id="reason" class="form-control" rows="4" required></textarea>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-danger">Send Query</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle (with Popper.js for modal functionality) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Modal Setup -->
+    <script>
+        function setQueryData(year, term, subjectId, classId) {
+            document.getElementById('queryYear').value = year;
+            document.getElementById('queryTerm').value = term;
+            document.getElementById('querySubjectId').value = subjectId;
+            document.getElementById('queryClassId').value = classId;
+        }
+    </script>
+</body>
+</html>

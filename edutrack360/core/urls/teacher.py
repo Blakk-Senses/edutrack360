@@ -1,7 +1,6 @@
 from django.urls import path
 from core.views.view_teacher import (
-    subject_performance_analysis,progress_trends,
-    settings, get_classes_by_department,
+    subject_performance_analysis, settings, get_classes_by_department,
     get_available_terms, get_departments, get_subjects_by_department,
     manual_upload_result, bulk_upload_results, download_result_template,
     get_classes, get_class_department, download_subject_analysis_pdf,
@@ -30,15 +29,13 @@ urlpatterns = [
     path('upload-result/bulk/', bulk_upload_results, name='bulk_upload'),
     path('upload-result/template/', download_result_template, name='download_result_template'),
 
-
-    path('progress_trends/', progress_trends, name='progress_trends'),
     path('settings/', settings, name='settings'),
     
     path("subject-performance-analysis/", subject_performance_analysis, name="subject_performance_analysis"),
     path("subject-performance/download/", download_subject_analysis_pdf, name="download_subject_analysis_pdf"),
     
     
-    path("class-performance-analysis/", class_performance_analysis, name="class_performance_analysis"),
+    path("class-performance/analysis/", class_performance_analysis, name="class_performance_analysis"),
     path("class-performance/download/", download_class_performance_pdf, name="download_class_performance_pdf"),
 
     path("files/", view_uploaded_files, name="view_uploaded_files"),

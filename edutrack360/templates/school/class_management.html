@@ -241,18 +241,19 @@
     
         function loadTeacherClasses(teacherId) {
             if (!teacherId) return;
-            fetch(`/school/get_teacher_classes/?teacher=${teacherId}`)
+            fetch(`/school/get_teacher_classes/?teacher_id=${teacherId}`)
                 .then(response => response.json())
                 .then(data => {
                     let classSelect = document.getElementById("remove-class");
                     classSelect.innerHTML = '<option value="">Select Class</option>';
-                    data.classes.forEach(cls => {
-                        classSelect.innerHTML += `<option value="${cls['assigned_class__id']}">${cls['assigned_class__name']}</option>`;
-                    });
 
+                    if (data.class) {
+                        classSelect.innerHTML += `<option value="${data.class.id}">${data.class.name}</option>`;
+                    }
                 })
                 .catch(error => console.error("Error loading teacher classes:", error));
         }
+
 
     
         function assignTeacher() {

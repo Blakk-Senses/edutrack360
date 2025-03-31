@@ -1,56 +1,49 @@
+# Standard library
+import csv
+import io
+import json
+from decimal import Decimal
+
+# Third-party libraries
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from openpyxl import Workbook
+from reportlab.lib import colors
+from reportlab.lib.colors import HexColor
+from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
+from reportlab.platypus import (
+    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+)
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.graphics.charts.textlabels import Label
+
+# Django core
+from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
+from django.core.files.storage import default_storage
+from django.core.paginator import Paginator
+from django.db.models import Count, Q, Max, Avg
 from django.http import JsonResponse, HttpResponse, Http404, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
-from django.template.loader import render_to_string
-import csv
-import pandas as pd
-from django.core.files.storage import default_storage
-from django.contrib import messages
-import json
-import io
 from django.utils.text import slugify
-from django.core.paginator import Paginator
-from decimal import Decimal
-from django.db.models import Count, Q, Max
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
+
+# Local imports
 from core.forms import ResultUploadForm 
 from core.models import (
     Subject, Student, StudentMark, SubjectTeacher, ClassGroup,
     Department, Result, ClassTeacher, Teacher,
 )
-from openpyxl import Workbook
-from reportlab.lib.pagesizes import A4, letter
-from reportlab.pdfgen import canvas
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.units import mm
-from reportlab.graphics.shapes import Drawing
-from reportlab.graphics.charts.barcharts import VerticalBarChart
-from reportlab.graphics.charts.textlabels import Label
-from reportlab.lib.colors import HexColor
-
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from django.http import HttpResponse
-from django.db.models import Avg
-from django.shortcuts import render
-import json
-from django.core.paginator import Paginator
-from django.views.decorators.http import require_POST
-
 
 User = get_user_model()
 
-def upload_subject_results(request):
-    return render(request, 'teacher/subject_upload_results.html')
 
-def upload_class_results(request):
-    return render(request, 'teacher/class_upload_results.html')
-
-def progress_trends(request):
-    return render(request, 'teacher/progress_trends.html')
 
 def settings(request):
     return render(request, 'teacher/settings.html')
@@ -60,6 +53,8 @@ def settings(request):
 # Helper function for error handling
 def error_response(message, status=400):
     return JsonResponse({"error": message}, status=status)
+
+#---------------- API ENDPOINTS ----------------------
 
 @login_required
 def get_departments(request):
@@ -99,7 +94,6 @@ def get_classes_by_department(request, department_id):
     except Department.DoesNotExist:
         return JsonResponse({"error": "Invalid department selection"}, status=400)
 
-
 @login_required
 def get_subjects_by_department(request, department_id):
     """Fetch subjects based on the selected department."""
@@ -109,8 +103,6 @@ def get_subjects_by_department(request, department_id):
         return JsonResponse({"subjects": list(subjects)})
     except Department.DoesNotExist:
         return JsonResponse({"error": "Invalid department selection"}, status=400)
-
-
 
 @login_required
 def get_available_terms(request):
@@ -442,11 +434,6 @@ def download_subject_analysis_pdf(request):
     return response
 
 
-
-
-
-
-
 #------------------ CLASS TEACHER -----------------------
 
 def get_class_performance_context(request):
@@ -630,8 +617,6 @@ def get_class_performance_context(request):
         "term_chart": {"labels": term_labels, "data": term_values},
         "year_chart": {"labels": year_labels, "data": year_values},
     }
-
-
 
 @login_required
 def class_performance_analysis(request):
@@ -822,6 +807,12 @@ def download_class_performance_pdf(request):
 
 #---------------UPLOAD RESULTS----------------------------
 
+def upload_subject_results(request):
+    return render(request, 'teacher/subject_upload_results.html')
+
+def upload_class_results(request):
+    return render(request, 'teacher/class_upload_results.html')
+
 def can_teacher_upload_result(teacher, class_group, subject):
     has_subject_access = teacher.assigned_subjects.filter(id=subject.id).exists()
     is_class_teacher = ClassTeacher.objects.filter(
@@ -855,29 +846,29 @@ def manual_upload_result(request):
     if not can_teacher_upload_result(teacher, class_group, subject):
         return JsonResponse({"error": "Unauthorized: You are not allowed to upload results for this subject."}, status=403)
 
-    # Split full name into first and last name
+    
     name_parts = student_name.split(maxsplit=1)
     first_name = name_parts[0]
     last_name = name_parts[1] if len(name_parts) > 1 else ""
 
-    # Fetch or create student with teacher's school, circuit, and district
+    
     student, created = Student.objects.get_or_create(
         first_name=first_name,
         last_name=last_name,
         school=request.user.school,  # Ensure student gets the teacher's school
         defaults={
             "class_group": class_group,
-            "circuit": request.user.circuit,  # Assign teacher's circuit
-            "district": request.user.district  # Assign teacher's district
+            "circuit": request.user.circuit,  
+            "district": request.user.district  
         }
     )
 
-    # If student exists but class is different, update class_group
+    
     if not created and student.class_group != class_group:
         student.class_group = class_group
         student.save()
 
-    # Create result entry with school, circuit, and district
+    
     Result.objects.create(
         academic_year=academic_year,
         class_group=class_group,
@@ -887,8 +878,8 @@ def manual_upload_result(request):
         mark=mark,
         teacher=request.user,
         school=request.user.school,
-        circuit=request.user.circuit,  # Include circuit in result
-        district=request.user.district,  # Include district in result
+        circuit=request.user.circuit, 
+        district=request.user.district,  
         status="Pending"
     )
 
@@ -966,7 +957,6 @@ def bulk_upload_results(request):
             errors.append({"row": index + 1, "error": f"Invalid subject '{subject_name}' for class {class_name}"})
             continue
 
-        # ✅ Shared authorization logic (subject teacher OR class teacher in department)
         if not can_teacher_upload_result(teacher, class_group, subject):
             errors.append({
                 "row": index + 1,
@@ -1120,12 +1110,6 @@ def download_result_template(request):
 
 #------------------ RESULT MANAGEMENT -------------------
 
-from django.utils.text import slugify  # make sure this is imported
-from django.core.paginator import Paginator
-from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Max
-from django.shortcuts import render
-
 @login_required
 def view_uploaded_files(request):
     teacher = request.user
@@ -1148,7 +1132,7 @@ def view_uploaded_files(request):
         .order_by("-latest_upload")
     )
 
-    # Convert into a list of enriched dictionaries to include slugs
+    
     files = []
     for f in files_qs:
         academic_year = f["academic_year"]
@@ -1157,7 +1141,7 @@ def view_uploaded_files(request):
         f["term_slug"] = slugify(term) if term else ""
         files.append(f)
 
-    # Paginate enriched list
+    
     paginator = Paginator(files, 10)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
@@ -1170,7 +1154,6 @@ def view_uploaded_files(request):
 def view_result_entries(request, year, term, subject_id, class_id):
     teacher = request.user
 
-    # Restore original format from slugified URL
     year = str(year).replace('-', '/')
     term = term.replace('-', ' ').title()
 

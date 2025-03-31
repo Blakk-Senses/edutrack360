@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
-from django.db.models import Count, Avg, F, Q
+from django.db.models import Count, Avg, F, Q, Max
 from django.contrib.auth.hashers import make_password
 from django.http import JsonResponse, HttpResponse
 from core.models import (
@@ -36,6 +36,12 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from io import BytesIO
 import os
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.paginator import Paginator
+from django.utils.text import slugify
+from django.views.decorators.http import require_POST
+from django.utils import timezone
 from django.conf import settings
 import logging
 from django.core.validators import validate_email
@@ -123,7 +129,6 @@ def assign_teacher_to_subject(request, teacher_id, subject_id):
 
 @login_required
 def remove_teacher_from_subject(request, teacher_id, subject_id):
-    """Remove a teacher from a subject or specific classes, handling class assignments properly."""
     user_school = request.user.school
     if not user_school:
         return JsonResponse({"error": "User is not associated with any school"}, status=400)
@@ -133,51 +138,54 @@ def remove_teacher_from_subject(request, teacher_id, subject_id):
 
     if request.method == 'POST':
         data = json.loads(request.body)
-        class_ids = data.get("classes", [])  # List of class IDs to remove
+        class_ids = data.get("classes", [])
 
-        # Find the SubjectTeacher relationship
         subject_teacher = SubjectTeacher.objects.filter(teacher=teacher, subject=subject).first()
 
         if not subject_teacher:
             return JsonResponse({"error": "Teacher is not assigned to this subject"}, status=400)
 
         if class_ids:
-            # Remove only selected classes
             subject_teacher.assigned_classes.remove(*class_ids)
 
-            # If no more classes are assigned, delete the SubjectTeacher entry
-            if subject_teacher.assigned_classes.count() == 0:
-                subject_teacher.delete()
-        else:
-            # If no specific classes were provided, remove all assignments and delete the relationship
-            subject_teacher.assigned_classes.clear()
-            subject_teacher.delete()
-
-        # Check if the teacher is only teaching that subject in any remaining class and remove them from assigned_subjects if necessary
+        # If no more classes assigned to this subject-teacher pair
         if subject_teacher.assigned_classes.count() == 0:
+            subject_teacher.delete()
             teacher.assigned_subjects.remove(subject)
 
         return JsonResponse({"message": "Teacher removed from subject successfully!"})
 
     return JsonResponse({"error": "Invalid request method"}, status=400)
 
+@login_required
+def get_classes_by_teacher_and_subject(request):
+    teacher_id = request.GET.get("teacher_id")
+    subject_id = request.GET.get("subject_id")
+
+    if not teacher_id or not subject_id:
+        return JsonResponse({"error": "Both teacher and subject are required"}, status=400)
+
+    try:
+        subject_teacher = SubjectTeacher.objects.get(teacher_id=teacher_id, subject_id=subject_id)
+        class_groups = subject_teacher.assigned_classes.all()
+        classes = [{"id": cls.id, "name": cls.name} for cls in class_groups]
+        return JsonResponse({"classes": classes})
+    except SubjectTeacher.DoesNotExist:
+        return JsonResponse({"classes": []})
 
 
 @login_required
-def get_subjects_by_teacher(request):
-    """Fetch subjects assigned to a specific teacher."""
-    teacher_id = request.GET.get("teacher_id")
-    user_school = request.user.school  # Ensure user belongs to a school
+def get_subjects_by_teacher(request, teacher_id):  # <-- changed
+    user_school = request.user.school
 
     if not teacher_id or not user_school:
         return JsonResponse({"error": "Invalid request"}, status=400)
 
     teacher = get_object_or_404(Teacher, id=teacher_id, school=user_school)
+    subjects = teacher.assigned_subjects.all()
 
-    # Ensure 'assigned_subjects' is the correct related name in your model
-    subjects = teacher.assigned_subjects.all()  
+    return JsonResponse([{"id": s.id, "name": s.name} for s in subjects], safe=False)  # <-- changed to list directly
 
-    return JsonResponse({"subjects": [{"id": s.id, "name": s.name} for s in subjects]})
 
 
 
@@ -345,22 +353,25 @@ def get_classes_by_department(request):
 
 @login_required
 def get_teacher_classes(request):
-    """Fetch classes assigned to a teacher."""
-    teacher_id = request.GET.get("teacher_id")  # Ensure consistency
+    teacher_id = request.GET.get('teacher_id')
     user_school = request.user.school
 
-    if not teacher_id:
-        return JsonResponse({"error": "Teacher ID is required"}, status=400)
+    if not teacher_id or not user_school:
+        return JsonResponse({'error': 'Missing teacher or school info'}, status=400)
 
     teacher = get_object_or_404(Teacher, id=teacher_id, school=user_school)
 
-    # Ensure 'ClassTeacher' model exists and has correct relations
-    teacher_classes = ClassTeacher.objects.filter(teacher=teacher).values(
-        "assigned_class__id", "assigned_class__name"
-    )
-
-    return JsonResponse({"classes": list(teacher_classes)})  # Return structured data
-
+    try:
+        class_teacher = ClassTeacher.objects.select_related('assigned_class').get(teacher=teacher)
+        assigned_class = class_teacher.assigned_class
+        return JsonResponse({
+            'class': {
+                'id': assigned_class.id,
+                'name': assigned_class.name
+            }
+        })
+    except ClassTeacher.DoesNotExist:
+        return JsonResponse({'class': None})  # Teacher has no class
 
 # ------------------ TEACHER MANAGEMENT --------------------
 
@@ -948,44 +959,101 @@ def submit_results(request):
     return render(request, 'school/submit_results.html')
 
 
-def view_result(request, result_id):
-    """Displays the detailed result."""
-    result = get_object_or_404(Result, id=result_id)
-    return render(request, 'results/submit_results.html', {'result': result})
+@login_required
+@user_passes_test(lambda u: u.role == "headteacher")  # adjust according to your role system
+def headteacher_result_overview(request):
+    grouped_results = (
+        Result.objects
+        .values("academic_year", "term", "subject__id", "subject__name", "class_group__id", "class_group__name")
+        .annotate(
+            total_entries=Count("id"),
+            latest_upload=Max("submitted_at"),
+            status=F("status")  # assuming all entries in a group have same status
+        )
+        .order_by("-latest_upload")
+    )
+
+    # Process for template slugs
+    files = []
+    for f in grouped_results:
+        f["year_slug"] = f["academic_year"].replace("/", "-")
+        f["term_slug"] = slugify(f["term"])
+        files.append(f)
+
+    paginator = Paginator(files, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "school/result_review.html", {"page_obj": page_obj})
+
+@login_required
+@user_passes_test(lambda u: u.role == "headteacher")
+def headteacher_view_result(request, year, term, subject_id, class_id):
+    year = str(year).replace('-', '/')
+    term = term.replace('-', ' ').title()
+
+    results = Result.objects.filter(
+        academic_year=year,
+        term=term,
+        subject_id=subject_id,
+        class_group_id=class_id
+    ).select_related("student", "subject", "class_group")
+
+    if not results.exists():
+        return render(request, "school/view_result.html", {
+            "results": [], "subject": None, "class_group": None, "year": year, "term": term
+        })
+
+    subject = results[0].subject
+    class_group = results[0].class_group
+
+    return render(request, "school/view_result.html", {
+        "results": results,
+        "subject": subject,
+        "class_group": class_group,
+        "year": year,
+        "term": term
+    })
 
 
-def submit_result(request, result_id):
-    result = get_object_or_404(Result, id=result_id)
-    
-    # Check if the result is already submitted
-    if result.status == "Submitted":
-        messages.warning(request, "This result has already been submitted.")
-        return redirect("school:view_results")
+@require_POST
+@login_required
+@user_passes_test(lambda u: u.role == "headteacher")
+def submit_result(request):
+    year = request.POST.get("year").replace("-", "/")
+    term = request.POST.get("term").replace("-", " ").title()
+    subject_id = request.POST.get("subject_id")
+    class_id = request.POST.get("class_id")
 
-    # Submit the result
-    result.status = "Submitted"
-    result.save()
-    
-    # Add notification
-    messages.success(request, f"{result.subject.name} ({result.class_group}) has been submitted.")
+    Result.objects.filter(
+        academic_year=year,
+        term=term,
+        subject_id=subject_id,
+        class_group_id=class_id
+    ).update(
+        status="Submitted",
+        approved_at=timezone.now()
+    )
+    return redirect("school:headteacher_result_overview")  # or wherever appropriate
 
-    return redirect("school:view_results")
 
-def query_result(request, result_id):
-    if request.method == "POST":
-        result = get_object_or_404(Result, id=result_id)
-        query_reason = request.POST.get("query_reason", "")
+@require_POST
+@login_required
+@user_passes_test(lambda u: u.role == "headteacher")
+def query_result(request):
+    year = request.POST.get("year").replace("-", "/")
+    term = request.POST.get("term").replace("-", " ").title()
+    subject_id = request.POST.get("subject_id")
+    class_id = request.POST.get("class_id")
+    reason = request.POST.get("reason", "")
 
-        # Check if the result is already queried
-        if result.status == "Queried":
-            messages.warning(request, "This result has already been queried.")
-            return redirect("school:view_results")
-
-        # Query the result
-        result.status = "Queried"
-        result.save()
-
-        # Add notification
-        messages.error(request, f"{result.subject.name} ({result.class_group}) has been queried: {query_reason}")
-
-        return redirect("school:view_results")
+    Result.objects.filter(
+        academic_year=year,
+        term=term,
+        subject_id=subject_id,
+        class_group_id=class_id
+    ).update(
+        status="Queried",
+        query_reason=reason
+    )
+    return redirect("school:headteacher_result_overview")

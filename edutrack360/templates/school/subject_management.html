@@ -122,19 +122,28 @@
             <!-- Remove Subject Section -->
             <div class="tab-pane fade p-4 shadow rounded bg-white" id="remove-subject" role="tabpanel">
                 <h4 class="text-danger"><i class="fas fa-user-times me-2"></i> Remove a Subject from a Teacher</h4>
+                
                 <form id="removeSubjectForm">
                     <div class="mb-3">
                         <label for="remove-teacher" class="fw-semibold">Select Teacher:</label>
                         <select class="form-control border-danger" id="remove-teacher" name="remove-teacher" required></select>
                     </div>
+
                     <div class="mb-3">
-                        <label for="remove-subject" class="fw-semibold">Select Subject:</label>
-                        <select class="form-control border-danger" id="remove-subject" name="remove-subject" required></select>
+                        <label for="remove-subject-name" class="fw-semibold">Select Subject:</label>
+                        <select class="form-control border-danger" id="remove-subject-name" name="remove-subject" required></select>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="fw-semibold">Select Classes:</label>
+                        <div id="remove-classes" class="border p-2 rounded"></div>
+                    </div>
+
                     <button type="submit" class="btn btn-danger w-100">
                         <i class="fas fa-trash me-1"></i> Remove Subject
                     </button>
                 </form>
+
                 <div id="remove-result" class="mt-3"></div>
             </div>
         </div>
@@ -161,245 +170,322 @@
         document.addEventListener("DOMContentLoaded", function () {
             loadDepartments();
             loadTeachers();
-
-            // Event listener for Add Subject tab
-            document.getElementById("department").addEventListener("change", function () {
-                let departmentId = this.value;
-                console.log("Department changed in Add Subject:", departmentId);
-                loadSubjectsByDepartment(departmentId, "subject");
-                loadClassesByDepartment(departmentId);
-            });
-
-            // Event listener for Assign Subject tab
-            document.getElementById("assign-department").addEventListener("change", function () {
-                let departmentId = this.value;
-                console.log("Department changed in Assign Subject:", departmentId);
-                loadSubjectsByDepartment(departmentId, "subject");
-                loadClassesByDepartment(departmentId);
-            });
-
-            // Event listener for teacher selection in Assign Subject tab
-            document.getElementById("teacher").addEventListener("change", function () {
-                loadSubjectsByTeacher(this.value, "subject");
-            });
-
-            // Event listener for teacher selection in Remove Subject tab
-            document.getElementById("remove-teacher").addEventListener("change", function () {
-                loadSubjectsByTeacher(this.value, "remove-subject");
-            });
-
-            // Form submit listeners for handling actions
-            document.getElementById("addSubjectForm").addEventListener("submit", function (event) {
-                event.preventDefault();
-                addSubject();
-            });
-
-            document.getElementById("assignSubjectForm").addEventListener("submit", function (event) {
-                event.preventDefault();
-                assignSubject();
-            });
-
-            document.getElementById("removeSubjectForm").addEventListener("submit", function (event) {
-                event.preventDefault();
-                removeSubject();
-            });
+    
+            const departmentEl = document.getElementById("department");
+            const assignDeptEl = document.getElementById("assign-department");
+            const teacherEl = document.getElementById("teacher");
+            const removeTeacherEl = document.getElementById("remove-teacher");
+            const removeSubjectEl = document.getElementById("remove-subject");
+    
+            if (departmentEl) {
+                departmentEl.addEventListener("change", function () {
+                    const departmentId = this.value;
+                    console.log("Department changed in Add Subject:", departmentId);
+                    loadSubjectsByDepartment(departmentId, "subject");
+                    loadClassesByDepartment(departmentId);
+                });
+            }
+    
+            if (assignDeptEl) {
+                assignDeptEl.addEventListener("change", function () {
+                    const departmentId = this.value;
+                    console.log("Department changed in Assign Subject:", departmentId);
+                    loadSubjectsByDepartment(departmentId, "subject");
+                    loadClassesByDepartment(departmentId);
+                });
+            }
+    
+            if (teacherEl) {
+                teacherEl.addEventListener("change", function () {
+                    loadSubjectsByTeacher(this.value, "subject");
+                });
+            }
+    
+            if (removeTeacherEl) {
+                removeTeacherEl.addEventListener("change", function () {
+                    loadSubjectsByTeacher(this.value, "remove-subject");
+                    const removeClassesContainer = document.getElementById("remove-classes");
+                    if (removeClassesContainer) removeClassesContainer.innerHTML = "";
+                });
+            }
+    
+            if (removeSubjectEl && removeTeacherEl) {
+                removeSubjectEl.addEventListener("change", function () {
+                    const teacherId = removeTeacherEl.value;
+                    const subjectId = this.value;
+                    loadRemoveClasses(teacherId, subjectId);
+                });
+            }
+    
+            const addForm = document.getElementById("addSubjectForm");
+            if (addForm) {
+                addForm.addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    addSubject();
+                });
+            }
+    
+            const assignForm = document.getElementById("assignSubjectForm");
+            if (assignForm) {
+                assignForm.addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    assignSubject();
+                });
+            }
+    
+            const removeForm = document.getElementById("removeSubjectForm");
+            if (removeForm) {
+                removeForm.addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    removeSubject();
+                });
+            }
         });
-
-        // Load departments
+    
         function loadDepartments() {
             fetch("/school/get_departments/")
                 .then(response => response.json())
                 .then(data => {
-                    let departmentSelects = document.querySelectorAll("#department, #assign-department");
+                    const departmentSelects = document.querySelectorAll("#department, #assign-department");
                     departmentSelects.forEach(select => {
                         select.innerHTML = '<option value="">Select Department</option>';
-                        data.departments.forEach(dept => {
+                        data.departments?.forEach(dept => {
                             select.innerHTML += `<option value="${dept.id}">${dept.name}</option>`;
                         });
                     });
                 })
                 .catch(error => console.error("Error loading departments:", error));
         }
-
-        // Load teachers
+    
         function loadTeachers() {
             fetch("/school/get_teachers/")
-            .then(response => response.json())
-            .then(data => {
-                if (!data.teachers || data.teachers.length === 0) {
-                    console.warn("No teachers found");
-                    return;
-                }
-                let teacherSelects = document.querySelectorAll("#teacher, #remove-teacher");
-                teacherSelects.forEach(select => {
-                    select.innerHTML = '<option value="">Select Teacher</option>';
-                    data.teachers.forEach(teacher => {
-                        let fullName = `${teacher.user__first_name} ${teacher.user__last_name}`;
-                        select.innerHTML += `<option value="${teacher.id}">${fullName}</option>`;
-                    });
-                });
-            })
-            .catch(error => console.error("Error loading teachers:", error));
-        }
-
-        // Load subjects by department
-        function loadSubjectsByDepartment(departmentId, selectId) {
-            if (!departmentId) return;
-
-            console.log("Fetching subjects for department:", departmentId);
-            fetch(`/school/get_subjects_by_department/?department_id=${departmentId}`)
                 .then(response => response.json())
                 .then(data => {
-                    let subjectSelect = document.getElementById(selectId);
+                    const teacherSelects = document.querySelectorAll("#teacher, #remove-teacher");
+                    teacherSelects.forEach(select => {
+                        select.innerHTML = '<option value="">Select Teacher</option>';
+                        data.teachers?.forEach(teacher => {
+                            const fullName = `${teacher.user__first_name} ${teacher.user__last_name}`;
+                            select.innerHTML += `<option value="${teacher.id}">${fullName}</option>`;
+                        });
+                    });
+                })
+                .catch(error => console.error("Error loading teachers:", error));
+        }
+    
+        function loadSubjectsByDepartment(departmentId, selectId) {
+            if (!departmentId) return;
+    
+            const subjectSelect = document.getElementById(selectId);
+            if (!subjectSelect) return;
+    
+            subjectSelect.innerHTML = '<option value="">Loading subjects...</option>';
+    
+            fetch(`/school/get_subjects_by_department/?department_id=${departmentId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.json();
+                })
+                .then(data => {
                     subjectSelect.innerHTML = '<option value="">Select Subject</option>';
-
-                    data.subjects.forEach(subj => {
+                    data.subjects?.forEach(subj => {
                         subjectSelect.innerHTML += `<option value="${subj.id}">${subj.name}</option>`;
                     });
                 })
                 .catch(error => console.error("Error fetching subjects:", error));
         }
-
-        // Load classes by department
+    
         function loadClassesByDepartment(departmentId) {
-            if (!departmentId) {
-                console.error("Error: departmentId is undefined or empty.");
-                return;
-            }
-
-            let url = `/school/get_classes_by_department/?department_id=${departmentId}`;
-            console.log("Fetching classes for department:", departmentId);
-
-            fetch(url)
-                .then(response => response.json())
+            if (!departmentId) return;
+    
+            fetch(`/school/get_classes_by_department/?department_id=${departmentId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.json();
+                })
                 .then(data => {
-                    if (!data.classes || !Array.isArray(data.classes)) {
-                        console.error("Error: 'classes' is missing or invalid in the response:", data);
+                    const classContainer = document.getElementById("classes-container");
+                    if (!classContainer) return;
+    
+                    classContainer.innerHTML = "";
+    
+                    if (!data.classes?.length) {
+                        classContainer.innerHTML = "<p class='text-muted'>No classes found.</p>";
                         return;
                     }
-
-                    let classContainer = document.getElementById("classes-container");
-                    if (!classContainer) {
-                        console.error("Error: Element with ID 'classes-container' not found.");
-                        return;
-                    }
-
-                    classContainer.innerHTML = ""; // Clear previous entries
-
+    
                     data.classes.forEach(cls => {
-                        let checkbox = document.createElement("input");
+                        const checkbox = document.createElement("input");
                         checkbox.type = "checkbox";
                         checkbox.value = cls.id;
                         checkbox.id = `class-${cls.id}`;
                         checkbox.name = "classes";
                         checkbox.classList.add("form-check-input");
-
-                        let label = document.createElement("label");
+    
+                        const label = document.createElement("label");
                         label.htmlFor = `class-${cls.id}`;
                         label.textContent = cls.name;
                         label.classList.add("form-check-label", "ms-2");
-
-                        let div = document.createElement("div");
+    
+                        const div = document.createElement("div");
                         div.classList.add("form-check");
                         div.appendChild(checkbox);
                         div.appendChild(label);
-
+    
                         classContainer.appendChild(div);
                     });
                 })
                 .catch(error => console.error("Error fetching classes:", error));
         }
-
+    
         function loadSubjectsByTeacher(teacherId, selectId) {
             if (!teacherId) return;
+    
+            const subjectSelect = document.getElementById(selectId);
+            if (!subjectSelect) return;
+    
+            subjectSelect.innerHTML = '<option value="">Loading subjects...</option>';
+    
             fetch(`/school/get_subjects_by_teacher/${teacherId}/`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.json();
+                })
                 .then(data => {
-                    let subjectSelect = document.getElementById(selectId);
                     subjectSelect.innerHTML = '<option value="">Select Subject</option>';
                     data.forEach(subj => {
                         subjectSelect.innerHTML += `<option value="${subj.id}">${subj.name}</option>`;
                     });
-                });
+                })
+                .catch(error => console.error("Error loading subjects by teacher:", error));
         }
-
-        // Add subject
+    
+        function loadRemoveClasses(teacherId, subjectId) {
+            if (!teacherId || !subjectId) return;
+    
+            fetch(`/school/get_classes_by_teacher_and_subject/?teacher_id=${teacherId}&subject_id=${subjectId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.json();
+                })
+                .then(data => {
+                    const container = document.getElementById("remove-classes");
+                    if (!container) return;
+    
+                    container.innerHTML = "";
+    
+                    if (!data.classes?.length) {
+                        container.innerHTML = "<p class='text-muted'>No classes assigned for this subject.</p>";
+                        return;
+                    }
+    
+                    data.classes.forEach(cls => {
+                        const checkbox = document.createElement("input");
+                        checkbox.type = "checkbox";
+                        checkbox.value = cls.id;
+                        checkbox.id = `remove-class-${cls.id}`;
+                        checkbox.name = "remove-classes";
+                        checkbox.classList.add("form-check-input");
+    
+                        const label = document.createElement("label");
+                        label.htmlFor = `remove-class-${cls.id}`;
+                        label.textContent = cls.name;
+                        label.classList.add("form-check-label", "ms-2");
+    
+                        const div = document.createElement("div");
+                        div.classList.add("form-check");
+                        div.appendChild(checkbox);
+                        div.appendChild(label);
+    
+                        container.appendChild(div);
+                    });
+                })
+                .catch(error => console.error("Error fetching assigned classes:", error));
+        }
+    
         function addSubject() {
-            let department = document.getElementById("department").value;
-            let subjectName = document.getElementById("subjectName").value;
-
+            const department = document.getElementById("department")?.value;
+            const subjectName = document.getElementById("subjectName")?.value;
+    
             fetch("/school/add_subject_to_department/", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                     "X-CSRFToken": getCSRFToken()
                 },
-                body: `department=${department}&subject_name=${subjectName}`
+                body: `department=${department}&subject_name=${encodeURIComponent(subjectName)}`
             })
-            .then(response => response.json())
-            .then(data => showModal(data.message || data.error))
-            .catch(error => console.error("Error adding subject:", error));
+                .then(response => response.json())
+                .then(data => {
+                    showModal(data.message || data.error);
+                    document.getElementById("addSubjectForm")?.reset();
+                })
+                .catch(error => console.error("Error adding subject:", error));
         }
-
-        // Assign subject
+    
         function assignSubject() {
-            let teacher = document.getElementById("teacher").value;
-            let subject = document.getElementById("subject").value;
-            let selectedClasses = Array.from(document.querySelectorAll("#classes-container input[type=checkbox]:checked")).map(cb => cb.value);
-
+            const teacher = document.getElementById("teacher")?.value;
+            const subject = document.getElementById("subject")?.value;
+            const selectedClasses = Array.from(document.querySelectorAll("#classes-container input[type=checkbox]:checked")).map(cb => cb.value);
+    
             if (!teacher || !subject || selectedClasses.length === 0) {
-                showModal("Please select a teacher, subject, and at least one class.");
+                showModal("Please select teacher, subject, and at least one class.");
                 return;
             }
-
-            fetch(`/school/assign_teacher_to_subject/${teacher}/${subject}/`, {
+    
+            fetch("/school/assign_subject_to_teacher/", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded",
                     "X-CSRFToken": getCSRFToken()
                 },
-                body: JSON.stringify({ classes: selectedClasses })
+                body: `teacher=${teacher}&subject=${subject}&classes=${selectedClasses.join(",")}`
             })
-            .then(response => response.json())
-            .then(data => showModal(data.message || data.error))
-            .catch(error => console.error("Error assigning subject:", error));
+                .then(response => response.json())
+                .then(data => {
+                    showModal(data.message || data.error);
+                    document.getElementById("assignSubjectForm")?.reset();
+                })
+                .catch(error => console.error("Error assigning subject:", error));
         }
-
-        // Remove subject
+    
         function removeSubject() {
-            let teacher = document.getElementById("remove-teacher").value;
-            let subject = document.getElementById("remove-subject").value;
-            let selectedClasses = Array.from(document.querySelectorAll("#remove-classes input[type=checkbox]:checked")).map(cb => cb.value);
-
-            if (!teacher || !subject) {
-                showModal("Please select a teacher and subject.");
+            const teacher = document.getElementById("remove-teacher")?.value;
+            const subject = document.getElementById("remove-subject")?.value;
+            const selectedClasses = Array.from(document.querySelectorAll("#remove-classes input[type=checkbox]:checked")).map(cb => cb.value);
+    
+            if (!teacher || !subject || selectedClasses.length === 0) {
+                showModal("Please select teacher, subject, and at least one class to remove.");
                 return;
             }
-
-            fetch(`/school/remove_teacher_from_subject/${teacher}/${subject}/`, {
+    
+            fetch("/school/remove_subject_assignment/", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded",
                     "X-CSRFToken": getCSRFToken()
                 },
-                body: JSON.stringify({ classes: selectedClasses })
+                body: `teacher=${teacher}&subject=${subject}&classes=${selectedClasses.join(",")}`
             })
-            .then(response => response.json())
-            .then(data => showModal(data.message || data.error))
-            .catch(error => console.error("Error removing subject:", error));
+                .then(response => response.json())
+                .then(data => {
+                    showModal(data.message || data.error);
+                    document.getElementById("removeSubjectForm")?.reset();
+                    document.getElementById("remove-classes").innerHTML = "";
+                })
+                .catch(error => console.error("Error removing subject:", error));
         }
-
-        // Show modal with message
-        function showModal(message) {
-            document.querySelector("#confirmationModal .modal-body").innerHTML = message;
-            new bootstrap.Modal(document.getElementById("confirmationModal")).show();
-        }
-
-        // Get CSRF token
+    
         function getCSRFToken() {
-            return document.cookie.split("; ").find(row => row.startsWith("csrftoken="))?.split("=")[1];
+            return document.querySelector('[name=csrfmiddlewaretoken]')?.value;
         }
-    </script>
+    
+        function showModal(message) {
+            const modal = new bootstrap.Modal(document.getElementById("feedbackModal"));
+            document.getElementById("feedbackModalBody").innerText = message;
+            modal.show();
+        }
+    </script> 
     
 </body>
 </html>
