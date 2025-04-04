@@ -1,21 +1,27 @@
 # myapp/urls.py
 from django.urls import path
 from core.views.view_siso import (
-    download_circuit_report, circuit_overview, 
-    siso_generate_reports, siso_send_notifications,
-    view_notifications, send_notification, get_notifications
+    circuit_performance_analysis, circuit_overview, notifications,
+    get_notifications,mark_notification_as_read, get_headteachers_by_circuit,
+
 )
 
 app_name = 'siso'
 
 urlpatterns = [ 
-    path('circuit-overview/', circuit_overview, name='circuit_overview'),
-    path('generate-reports/', siso_generate_reports, name='siso_generate_reports'),
-    path('send-notifications/', siso_send_notifications, name='siso_send_notifications'),
-    path('view-notifications/', view_notifications, name='view_notifications'),
-    path('download-circuit-report/<int:circuit_id>/', download_circuit_report, name='download_circuit_report'),
-    path('send-notification/', send_notification, name='send_notification'),
-    path('get-notifications/', get_notifications, name='get_notifications'),
+    #path('schools/', get_siso_schools, name='get_siso_schools'),
+
+    path('circuit/overview/', circuit_overview, name='circuit_overview'),
+    path('circuit/performance/analysis/', circuit_performance_analysis, name='circuit_performance_analysis'),
+    #path('performance/download/', download_circuit_performance_pdf, name='download_circuit_performance_pdf'),
+
+
+
+    path('notifications/send/', notifications, name='notifications'),
+    path('notifications/', get_notifications, name='get_notifications'),
+    path('notifications/headteachers/', get_headteachers_by_circuit, name='get_headteachers_by_circuit'),
+    path('notifications/mark-as-read/<int:notification_id>/', mark_notification_as_read, name='mark_notification_as_read'),
+
 
 ]
 

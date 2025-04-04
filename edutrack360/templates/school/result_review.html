@@ -166,6 +166,72 @@
 
     <!-- Modal Setup -->
     <script>
+        $(document).ready(function () {
+            // Handle Submit Result
+            $("form.submit-result-form").submit(function (event) {
+                event.preventDefault(); // Prevent form from submitting normally
+    
+                var form = $(this);
+                var submitButton = form.find("button[type='submit']");
+                submitButton.prop("disabled", true); // Disable submit button to avoid double submission
+    
+                $.ajax({
+                    type: form.attr("method"),
+                    url: form.attr("action"),
+                    data: form.serialize(),
+                    success: function (response) {
+                        if (response.success) {
+                            var fileId = form.data("file-id");
+                            var row = $("#file-" + fileId); // Get the row for this file
+    
+                            // Update the status badge to "Submitted"
+                            row.find(".status-badge").html('<span class="badge bg-success">Submitted</span>');
+    
+                            // Disable all buttons except the "View" button
+                            row.find("button, form").prop("disabled", true); // Disable all buttons and forms
+                            row.find("button.btn-outline-primary").prop("disabled", false); // Enable only the "View" button
+                            
+                            // Update submit button text to "Submitted" and disable it
+                            submitButton.text("Submitted").prop("disabled", true);
+                        }
+                    },
+                    error: function (response) {
+                        alert("An error occurred while submitting the result.");
+                        submitButton.prop("disabled", false); // Re-enable the submit button if there's an error
+                    }
+                });
+            });
+    
+            // Handle Query Submission (Modal)
+            $("form").submit(function (event) {
+                var form = $(this);
+                event.preventDefault(); // Prevent form submission
+    
+                var submitButton = form.find("button[type='submit']");
+                submitButton.prop("disabled", true);
+    
+                $.ajax({
+                    type: form.attr("method"),
+                    url: form.attr("action"),
+                    data: form.serialize(),
+                    success: function (response) {
+                        if (response.success) {
+                            alert('Query successfully sent!');
+                            $('#queryModal').modal('hide'); // Close the modal after successful submission
+                        } else {
+                            alert('Failed to submit query. Please try again.');
+                        }
+                        submitButton.prop("disabled", false); // Re-enable submit button
+                    },
+                    error: function () {
+                        alert("Error submitting the query.");
+                        submitButton.prop("disabled", false);
+                    }
+                });
+            });
+        });
+    
+        // Setting the Modal Fields with Data
         function setQueryData(year, term, subjectId, classId) {
             document.getElementById('queryYear').value = year;
             document.getElementById('queryTerm').value = term;
@@ -173,5 +239,6 @@
             document.getElementById('queryClassId').value = classId;
         }
     </script>
+    
 </body>
 </html>

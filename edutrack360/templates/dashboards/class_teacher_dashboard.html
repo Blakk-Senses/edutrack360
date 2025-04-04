@@ -45,10 +45,11 @@
             <i class="fas fa-cog"></i>
             <span class="tooltip">Settings</span>
         </a>
-        <a href="{% url 'logout' %}" class="logout-link">
+        <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link">
             <i class="fas fa-sign-out-alt"></i>
             <span class="tooltip">Logout</span>
         </a>
+        
     </div>
     <div class="main-content">
         <div class="container mt-4">
@@ -71,7 +72,7 @@
                     </select>
                 </div>
             </div>
-    
+        
             <!-- Dashboard Metrics -->
             <div class="row g-3">
                 <!-- Total Students -->
@@ -84,171 +85,219 @@
                         <div class="icon"><i class="fas fa-users"></i></div>
                     </div>
                 </div>
-    
-                <!-- School Avg -->
+        
+                <!-- Class Avg -->
                 <div class="col-md-6">
-                    <div class="dashboard-card average-school-performance">
+                    <div class="dashboard-card average-class-performance">
                         <div>
-                            <h3>Average School Performance</h3>
+                            <h3>Average Class Performance</h3>
                             <p class="value">0%</p>
                         </div>
                         <div class="icon"><i class="fas fa-chart-line"></i></div>
                     </div>
                 </div>
-    
-                <!-- Total Teachers -->
+        
+                <!-- Top Students -->
                 <div class="col-md-6">
-                    <div class="dashboard-card total-teachers">
+                    <div class="dashboard-card best-performing-students">
                         <div>
-                            <h3>Total Teachers in the School</h3>
-                            <p class="value">0</p>
-                        </div>
-                        <div class="icon"><i class="fas fa-chalkboard-teacher"></i></div>
-                    </div>
-                </div>
-    
-                <!-- Best Subjects -->
-                <div class="col-md-6">
-                    <div class="dashboard-card best-performing-subjects">
-                        <div>
-                            <h3>Top 2 Performing Subjects</h3>
+                            <h3>Top Performing Students</h3>
                             <ul class="value"></ul>
                         </div>
                         <div class="icon"><i class="fas fa-trophy"></i></div>
                     </div>
                 </div>
-    
-                <!-- Weakest Subjects -->
+        
+                <!-- Weakest Students -->
                 <div class="col-md-6">
-                    <div class="dashboard-card weakest-performing-subjects">
+                    <div class="dashboard-card weakest-performing-students">
                         <div>
-                            <h3>Weakest 2 Subjects</h3>
+                            <h3>Weakest Performing Students</h3>
                             <ul class="value"></ul>
                         </div>
-                        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div class="icon"><i class="fas fa-user-slash"></i></div>
                     </div>
                 </div>
-    
-                <!-- Best Classes -->
+        
+                <!-- Best/Weakest Subjects -->
                 <div class="col-md-6">
-                    <div class="dashboard-card best-performing-classes">
+                    <div class="dashboard-card top-performing-subject">
                         <div>
-                            <h3>Top 3 Performing Classes</h3>
-                            <ul class="value"></ul>
+                            <h3>Top Performing Subject</h3>
+                            <p class="value">-</p>
                         </div>
-                        <div class="icon"><i class="fas fa-star"></i></div>
+                        <div class="icon"><i class="fas fa-book"></i></div>
                     </div>
                 </div>
-    
-                <!-- Performance Trend Chart -->
+        
+                <div class="col-md-6">
+                    <div class="dashboard-card bottom-performing-subject">
+                        <div>
+                            <h3>Weakest Performing Subjects</h3>
+                            <p class="value">-</p>
+                        </div>
+                        <div class="icon"><i class="fas fa-book-dead"></i></div>
+                    </div>
+                </div>
+        
+                <!-- Trend Chart -->
                 <div class="col-md-12">
                     <div class="custom-card">
-                        <div class="card-header">School Performance Trends</div>
+                        <div class="card-header">Class Performance Trends</div>
                         <div class="card-body">
                             <canvas id="performanceTrendsChart"></canvas>
                         </div>
                     </div>
                 </div>
-    
-                <!-- Notifications -->
+                <!-- Upcoming Deadlines & Reminders -->
                 <div class="col-md-12">
                     <div class="custom-card">
-                        <div class="card-header">Recent Uploads</div>
+                        <div class="card-header">Upcoming Deadlines & Reminders</div>
                         <div class="card-body">
-                            <ul class="recent-uploads value">
-                                <li>Loading...</li>
-                            </ul>
+                            <p>No upcoming deadlines.</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+        <!-- Logout Confirmation Modal -->
+        <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content text-center p-4 rounded-4 shadow-lg">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <i class="fa fa-exclamation-circle text-warning" style="font-size: 50px;"></i>
+                        </div>
+                        <h4 class="fw-bold">Are you sure?</h4>
+                        <p class="text-muted">You want to logout of the system?</p>
+                    </div>
+                    <div class="modal-footer border-0 d-flex justify-content-center">
+                        <button type="button" class="btn btn-danger px-4 py-2 rounded-pill" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-success px-4 py-2 rounded-pill" id="confirmLogout">Logout!</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     
-    <!-- JS -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        function formatPercent(value) {
-            return value !== null && !isNaN(value) ? parseFloat(value).toFixed(2) + "%" : "N/A";
-        }
-    
-        function fetchHeadteacherDashboardData() {
-            const academic_year = $("#yearFilter").val();
-            const term = $("#termFilter").val();
-    
-            $.ajax({
-                url: "{% url 'dashboards:headteacher_dashboard' %}",
-                data: { academic_year, term },
-                headers: { "X-Requested-With": "XMLHttpRequest" },
-                success: function (data) {
-                    $(".total-students-assessed .value").text(data.total_students_assessed || 0);
-                    $(".average-school-performance .value").text(formatPercent(data.total_school_average));
-                    $(".total-teachers .value").text(data.total_teachers || 0);
-    
-                    // Best Subjects
-                    let bestHtml = data.best_performing_subjects.length
-                        ? data.best_performing_subjects.map(s => `<li>${s.subject} (${formatPercent(s.average_score)})</li>`).join("")
-                        : "<li>No data available</li>";
-                    $(".best-performing-subjects .value").html(bestHtml);
-    
-                    // Weakest Subjects
-                    let weakHtml = data.worst_performing_subjects.length
-                        ? data.worst_performing_subjects.map(s => `<li>${s.subject} (${formatPercent(s.average_score)})</li>`).join("")
-                        : "<li>No data available</li>";
-                    $(".weakest-performing-subjects .value").html(weakHtml);
-    
-                    // Best Classes
-                    let classHtml = data.best_performing_classes.length
-                        ? data.best_performing_classes.map(c => `<li>${c.class_name} (${formatPercent(c.average_score)})</li>`).join("")
-                        : "<li>No data available</li>";
-                    $(".best-performing-classes .value").html(classHtml);
-    
-                    // Uploads
-                    let notifHtml = data.notifications.length
-                        ? data.notifications.map(n => `<li>${n}</li>`).join("")
-                        : "<li>No recent uploads</li>";
-                    $(".recent-uploads").html(notifHtml);
-    
-                    // Chart
-                    updateTrendChart(data.performance_trends);
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+        <!-- JS -->
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            function formatPercent(value) {
+                return value !== null && !isNaN(value) ? parseFloat(value).toFixed(2) + "%" : "N/A";
+            }
+        
+            function fetchClassTeacherDashboardData() {
+                const academic_year = $("#yearFilter").val();
+                const term = $("#termFilter").val();
+        
+                $.ajax({
+                    url: "{% url 'dashboards:class_teacher_dashboard' %}",
+                    data: { academic_year, term },
+                    headers: { "X-Requested-With": "XMLHttpRequest" },
+                    success: function (data) {
+                        $(".total-students-assessed .value").text(data.total_students_assessed || 0);
+                        $(".average-class-performance .value").text(formatPercent(data.average_class_performance));
+        
+                        // Best Students
+                        let bestHtml = data.best_students.length
+                            ? data.best_students.map(s => `<li>${s.name} (${formatPercent(s.mark)})</li>`).join("")
+                            : "<li>No data available</li>";
+                        $(".best-performing-students .value").html(bestHtml);
+        
+                        // Weakest Students
+                        let weakHtml = data.weakest_students.length
+                            ? data.weakest_students.map(s => `<li>${s.name} (${formatPercent(s.mark)})</li>`).join("")
+                            : "<li>No data available</li>";
+                        $(".weakest-performing-students .value").html(weakHtml);
+        
+                        // Top Subject
+                        if (data.top_performing_subject) {
+                            $(".top-performing-subject .value").text(`${data.top_performing_subject.subject__name} (${formatPercent(data.top_performing_subject.avg_mark)})`);
+                        } else {
+                            $(".top-performing-subject .value").text("N/A");
+                        }
+        
+                        // Bottom Subject
+                        if (data.bottom_performing_subject) {
+                            $(".bottom-performing-subject .value").text(`${data.bottom_performing_subject.subject__name} (${formatPercent(data.bottom_performing_subject.avg_mark)})`);
+                        } else {
+                            $(".bottom-performing-subject .value").text("N/A");
+                        }
+        
+                        updateTrendChart(data.performance_trends);
+                    }
+                });
+            }
+        
+            // Chart
+            const ctx = document.getElementById("performanceTrendsChart").getContext("2d");
+            const trendChart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: "Average Score by Subject",
+                        data: [],
+                        borderColor: "blue",
+                        backgroundColor: "rgba(0, 0, 255, 0.1)",
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Average Score (%)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Subjects'
+                            }
+                        }
+                    }
                 }
             });
-        }
-    
-        // Chart Init
-        const ctx = document.getElementById("performanceTrendsChart").getContext("2d");
-        const trendChart = new Chart(ctx, {
-            type: "line",
-            data: {
-                labels: [],
-                datasets: [{
-                    label: "Performance Trend",
-                    data: [],
-                    borderColor: "blue",
-                    fill: false
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: { y: { beginAtZero: true, max: 100 } }
+        
+            function updateTrendChart(trendData) {
+                const labels = trendData.map(e => e.subject__name || e.subject);
+                const scores = trendData.map(e => e.avg_mark);
+                trendChart.data.labels = labels;
+                trendChart.data.datasets[0].data = scores;
+                trendChart.update();
             }
-        });
-    
-        function updateTrendChart(trendData) {
-            const labels = trendData.map(e => e.term);
-            const scores = trendData.map(e => e.score);
-            trendChart.data.labels = labels;
-            trendChart.data.datasets[0].data = scores;
-            trendChart.update();
-        }
-    
-        // Trigger on filter change
-        $("#yearFilter, #termFilter").on("change", fetchHeadteacherDashboardData);
-        $(document).ready(fetchHeadteacherDashboardData);
-    </script>
-    
+        
+            $("#yearFilter, #termFilter").on("change", fetchClassTeacherDashboardData);
+            $(document).ready(fetchClassTeacherDashboardData);
 
-    
+            document.addEventListener("DOMContentLoaded", function () {
+                const logoutBtn = document.getElementById("logoutBtn");
+                const confirmLogout = document.getElementById("confirmLogout");
+                const logoutUrl = logoutBtn.getAttribute("data-logout-url");
+
+                const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
+
+                logoutBtn.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    logoutModal.show();
+                });
+
+                confirmLogout.addEventListener("click", function () {
+                    window.location.href = logoutUrl;
+                });
+            });
+        </script>
+        
 </body>
 </html>

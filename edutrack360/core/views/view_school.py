@@ -5,7 +5,8 @@ from django.contrib.auth.hashers import make_password
 from django.http import JsonResponse, HttpResponse
 from core.models import (
     Department, Subject, Result, Teacher,  
-    ClassTeacher, SubjectTeacher, ClassGroup, StudentMark 
+    ClassTeacher, SubjectTeacher, ClassGroup, StudentMark,
+    Notification, 
 )
 import io
 from collections import defaultdict
@@ -46,7 +47,10 @@ from django.conf import settings
 import logging
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
-from django.views import View
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 logger = logging.getLogger(__name__)
 
@@ -101,30 +105,31 @@ def assign_teacher_to_subject(request, teacher_id, subject_id):
     subject = get_object_or_404(Subject, id=subject_id)
 
     # 🚨 Prevent assigning a subject if the teacher is already a class teacher anywhere in the school
-    if teacher.assigned_classes.exists():
+    if SubjectTeacher.objects.filter(teacher=teacher, assigned_classes__isnull=False).exists():
         return JsonResponse({"error": "Teacher is already assigned as a class teacher and cannot be a subject teacher."}, status=400)
 
     if request.method == 'POST':
         assigned_class_ids = request.POST.getlist('assigned_class_ids')  # Get multiple class IDs
         assigned_classes = ClassGroup.objects.filter(id__in=assigned_class_ids, school=request.user.school)
 
+        if not assigned_classes.exists():
+            return JsonResponse({"error": "Invalid class selection."}, status=400)
+
         # Assign subject to teacher
         teacher.assigned_subjects.add(subject)
 
-        # Create SubjectTeacher relationship
-        subject_teacher, _ = SubjectTeacher.objects.get_or_create(teacher=teacher, subject=subject)
+        # Create or get SubjectTeacher relationship
+        subject_teacher, created = SubjectTeacher.objects.get_or_create(teacher=teacher, subject=subject)
 
-        # Assign multiple classes
-        subject_teacher.class_groups.set(assigned_classes)  # Set instead of add
+        # Ensure the many-to-many relationship is updated correctly
+        subject_teacher.assigned_classes.set(assigned_classes)  # Efficiently replace class assignments
 
+        subject_teacher.save()  # Explicitly save changes
 
-        if assigned_classes:
-            subject_teacher.class_groups.add(assigned_classes)  # Explicitly save classes
-
-        teacher.save()
         return JsonResponse({"message": "Subject and class assigned successfully!"})
 
     return JsonResponse({"error": "Invalid request"}, status=400)
+
 
 
 @login_required
@@ -134,28 +139,36 @@ def remove_teacher_from_subject(request, teacher_id, subject_id):
         return JsonResponse({"error": "User is not associated with any school"}, status=400)
 
     teacher = get_object_or_404(Teacher, id=teacher_id, school=user_school)
-    subject = get_object_or_404(Subject, id=subject_id, department__school=user_school)
+    subject = get_object_or_404(Subject, id=subject_id)
 
     if request.method == 'POST':
-        data = json.loads(request.body)
-        class_ids = data.get("classes", [])
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON data"}, status=400)
+
+        assigned_class_ids = data.get("assigned_class_ids", [])
 
         subject_teacher = SubjectTeacher.objects.filter(teacher=teacher, subject=subject).first()
 
         if not subject_teacher:
             return JsonResponse({"error": "Teacher is not assigned to this subject"}, status=400)
 
-        if class_ids:
-            subject_teacher.assigned_classes.remove(*class_ids)
+        if assigned_class_ids:
+            subject_teacher.assigned_classes.remove(
+                *ClassGroup.objects.filter(id__in=assigned_class_ids, school=user_school)
+            )
 
-        # If no more classes assigned to this subject-teacher pair
         if subject_teacher.assigned_classes.count() == 0:
             subject_teacher.delete()
             teacher.assigned_subjects.remove(subject)
 
+        teacher.save()
+
         return JsonResponse({"message": "Teacher removed from subject successfully!"})
 
     return JsonResponse({"error": "Invalid request method"}, status=400)
+
 
 @login_required
 def get_classes_by_teacher_and_subject(request):
@@ -955,20 +968,19 @@ def download_school_performance_pdf(request):
 #------------------- Submit Results -----------------------
 
 
-def submit_results(request):
-    return render(request, 'school/submit_results.html')
-
-
 @login_required
-@user_passes_test(lambda u: u.role == "headteacher")  # adjust according to your role system
+@user_passes_test(lambda u: u.role == "headteacher")
 def headteacher_result_overview(request):
+    school = request.user.school  # Assuming the user has a 'school' attribute
+
     grouped_results = (
         Result.objects
+        .filter(school=school)  # Add filtering by school
         .values("academic_year", "term", "subject__id", "subject__name", "class_group__id", "class_group__name")
         .annotate(
             total_entries=Count("id"),
             latest_upload=Max("submitted_at"),
-            status=F("status")  # assuming all entries in a group have same status
+            status=F("status")
         )
         .order_by("-latest_upload")
     )
@@ -989,6 +1001,7 @@ def headteacher_result_overview(request):
 @login_required
 @user_passes_test(lambda u: u.role == "headteacher")
 def headteacher_view_result(request, year, term, subject_id, class_id):
+    school = request.user.school  # Assuming the user has a 'school' attribute
     year = str(year).replace('-', '/')
     term = term.replace('-', ' ').title()
 
@@ -996,7 +1009,8 @@ def headteacher_view_result(request, year, term, subject_id, class_id):
         academic_year=year,
         term=term,
         subject_id=subject_id,
-        class_group_id=class_id
+        class_group_id=class_id,
+        school=school  # Add filtering by school
     ).select_related("student", "subject", "class_group")
 
     if not results.exists():
@@ -1025,17 +1039,41 @@ def submit_result(request):
     subject_id = request.POST.get("subject_id")
     class_id = request.POST.get("class_id")
 
-    Result.objects.filter(
+    headteacher_school = request.user.school  
+
+    # Fetch all matching results
+    results = Result.objects.filter(
+        school=headteacher_school,
         academic_year=year,
         term=term,
         subject_id=subject_id,
         class_group_id=class_id
-    ).update(
-        status="Submitted",
-        approved_at=timezone.now()
     )
-    return redirect("school:headteacher_result_overview")  # or wherever appropriate
 
+    if not results.exists():
+        return JsonResponse({"error": "No matching results found"}, status=400)
+
+    # Check if any result is already submitted
+    if results.filter(status="Submitted").exists():
+        return JsonResponse({"error": "Result has already been submitted"}, status=400)
+
+    # ✅ Update all matching results to "Submitted"
+    results.update(status="Submitted", approved_at=timezone.now())
+
+    # ✅ NOTIFICATION LOGIC: Send only **one** notification per submission
+    siso = User.objects.filter(circuit=headteacher_school.circuit, role="siso").first()
+    
+    if siso:
+        # Create a single notification for all results
+        Notification.objects.create(
+            sender=request.user,  
+            recipient=siso,  
+            message=f"{headteacher_school.name} has submitted results for {term} {year}.",  
+            is_read=False  
+        )
+
+    # ✅ Return success response
+    return JsonResponse({"success": "Results submitted successfully"}, status=200)
 
 @require_POST
 @login_required
@@ -1047,13 +1085,55 @@ def query_result(request):
     class_id = request.POST.get("class_id")
     reason = request.POST.get("reason", "")
 
-    Result.objects.filter(
+    result = Result.objects.filter(
         academic_year=year,
         term=term,
         subject_id=subject_id,
         class_group_id=class_id
-    ).update(
-        status="Queried",
-        query_reason=reason
-    )
+    ).first()
+
+    if result:
+        result.status = "Queried"
+        result.query_reason = reason
+        result.save()
+
     return redirect("school:headteacher_result_overview")
+
+
+@login_required
+def get_headteacher_notifications(request):
+    """Fetch notifications for the logged-in Headteacher."""
+    user = request.user
+
+    # Ensure only Headteachers can access
+    if user.role.lower() != "headteacher":
+        return JsonResponse({"error": "Unauthorized"}, status=403)
+
+    # Fetch unread notifications for the Headteacher
+    notifications = Notification.objects.filter(recipient=user).order_by('-created_at')
+
+    notifications_data = [
+        {
+            "id": n.id,
+            "message": n.message,
+            "sender": f"{n.sender.first_name} {n.sender.last_name}" if n.sender.first_name else n.sender.staff_id,
+            "sent_at": n.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            "read": n.read
+        }
+        for n in notifications
+    ]
+
+    return JsonResponse({"notifications": notifications_data}, status=200)
+
+@login_required
+def mark_notification_as_read(request, notification_id):
+    """Mark a notification as read for Headteacher."""
+    try:
+        notification = Notification.objects.get(id=notification_id, recipient=request.user)
+        notification.read = True
+        notification.save()
+        return JsonResponse({"success": "Notification marked as read"}, status=200)
+    except Notification.DoesNotExist:
+        return JsonResponse({"error": "Notification not found"}, status=404)
+
+

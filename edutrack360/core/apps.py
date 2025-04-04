@@ -7,4 +7,3 @@ class CoreConfig(AppConfig):
     def ready(self):
         import core.signals  # Ensures signals are loaded when the app starts
 
-

@@ -1,31 +1,25 @@
-"""
-ASGI config for edutrack360 project.
-
-It exposes the ASGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/5.1/howto/deployment/asgi/
-"""
+# edutrack360/asgi.py
 
 import os
-from django.urls import path
-from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
-from core.notifications import consumers
+from channels.routing import ProtocolTypeRouter, URLRouter
 from django.core.asgi import get_asgi_application
+from channels.routing import ProtocolTypeRouter, URLRouter
+from django.urls import path
+from core.consumers import NotificationConsumer  # Ensure you have the correct import for the consumer
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'edutrack360.settings')
 
-application = get_asgi_application()
-
+# WebSocket URL routing
+websocket_urlpatterns = [
+    path('ws/notifications/', NotificationConsumer.as_asgi()),
+]
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
     "websocket": AuthMiddlewareStack(
-        URLRouter([
-            # Map to WebSocket consumer
-            path("ws/notifications/", consumers.NotificationConsumer.as_asgi()),
-        ])
+        URLRouter(
+            websocket_urlpatterns
+        )
     ),
 })
-

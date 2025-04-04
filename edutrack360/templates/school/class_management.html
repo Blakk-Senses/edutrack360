@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Teachers</title>
+    <title>Class Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -152,37 +152,48 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        window.SCHOOL_URLS = {
+            getTeachers: "{% url 'school:get_teachers' %}",
+            getDepartments: "{% url 'school:get_departments' %}",
+            getClassesByDepartment: "{% url 'school:get_classes_by_department' %}",
+            getTeacherClasses: "{% url 'school:get_teacher_classes' %}",
+            assignTeacherToClass: "{% url 'school:assign_teacher_to_class' %}",
+            removeTeacherFromClass: "{% url 'school:remove_teacher_from_class' %}",
+            addClassToDepartment: "{% url 'school:add_class_to_department' %}"
+        };
+    </script>    
+    <script>
         document.addEventListener("DOMContentLoaded", function () {
             loadTeachers();
             loadDepartments();
-            loadDepartmentsForClass(); // Load departments for the "Add Class" form
-    
+            loadDepartmentsForClass();
+        
             document.getElementById("department").addEventListener("change", function () {
                 loadClasses(this.value);
             });
-    
+        
             document.getElementById("assignTeacherForm").addEventListener("submit", function (event) {
                 event.preventDefault();
                 assignTeacher();
             });
-    
+        
             document.getElementById("remove-teacher").addEventListener("change", function () {
                 loadTeacherClasses(this.value);
             });
-    
+        
             document.getElementById("removeTeacherForm").addEventListener("submit", function (event) {
                 event.preventDefault();
                 removeTeacher();
             });
-    
+        
             document.getElementById("addClassForm").addEventListener("submit", function (event) {
                 event.preventDefault();
                 addClassToDepartment();
             });
         });
-    
+        
         function loadTeachers() {
-            fetch("/school/get_teachers/")
+            fetch(window.SCHOOL_URLS.getTeachers)
                 .then(response => response.json())
                 .then(data => {
                     let teacherSelect = document.getElementById("teacher");
@@ -198,9 +209,9 @@
                 })
                 .catch(error => console.error("Error loading teachers:", error));
         }
-    
+        
         function loadDepartments() {
-            fetch("/school/get_departments/")
+            fetch(window.SCHOOL_URLS.getDepartments)
                 .then(response => response.json())
                 .then(data => {
                     let departmentSelect = document.getElementById("department");
@@ -211,9 +222,9 @@
                 })
                 .catch(error => console.error("Error loading departments:", error));
         }
-    
+        
         function loadDepartmentsForClass() {
-            fetch("/school/get_departments/")
+            fetch(window.SCHOOL_URLS.getDepartments)
                 .then(response => response.json())
                 .then(data => {
                     let departmentSelect = document.getElementById("class-department");
@@ -224,10 +235,10 @@
                 })
                 .catch(error => console.error("Error loading departments:", error));
         }
-    
+        
         function loadClasses(departmentId) {
             if (!departmentId) return;
-            fetch(`/school/get_classes_by_department/?department_id=${departmentId}`)
+            fetch(`${window.SCHOOL_URLS.getClassesByDepartment}?department_id=${departmentId}`)
                 .then(response => response.json())
                 .then(data => {
                     let classSelect = document.getElementById("class");
@@ -238,37 +249,37 @@
                 })
                 .catch(error => console.error("Error loading classes:", error));
         }
-    
+        
         function loadTeacherClasses(teacherId) {
             if (!teacherId) return;
-            fetch(`/school/get_teacher_classes/?teacher_id=${teacherId}`)
+            fetch(`${window.SCHOOL_URLS.getTeacherClasses}?teacher_id=${teacherId}`)
                 .then(response => response.json())
                 .then(data => {
                     let classSelect = document.getElementById("remove-class");
                     classSelect.innerHTML = '<option value="">Select Class</option>';
-
                     if (data.class) {
                         classSelect.innerHTML += `<option value="${data.class.id}">${data.class.name}</option>`;
                     }
                 })
                 .catch(error => console.error("Error loading teacher classes:", error));
         }
-
-
-    
+        
         function assignTeacher() {
             let teacher = document.getElementById("teacher").value;
             let department = document.getElementById("department").value;
             let classId = document.getElementById("class").value;
-    
+        
             if (!teacher || !department || !classId) {
                 showModal("All fields are required.");
                 return;
             }
-    
-            fetch("/school/assign_teacher_to_class/", {
+        
+            fetch(window.SCHOOL_URLS.assignTeacherToClass, {
                 method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRFToken": getCSRFToken() },
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": getCSRFToken()
+                },
                 body: `teacher=${teacher}&department=${department}&class=${classId}`
             })
             .then(response => response.json())
@@ -278,19 +289,22 @@
             })
             .catch(error => console.error("Error assigning teacher:", error));
         }
-    
+        
         function removeTeacher() {
             let teacher = document.getElementById("remove-teacher").value;
             let classId = document.getElementById("remove-class").value;
-    
+        
             if (!teacher || !classId) {
                 showModal("All fields are required.");
                 return;
             }
-    
-            fetch("/school/remove_teacher_from_class/", {
+        
+            fetch(window.SCHOOL_URLS.removeTeacherFromClass, {
                 method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRFToken": getCSRFToken() },
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": getCSRFToken()
+                },
                 body: `remove-teacher=${teacher}&remove-class=${classId}`
             })
             .then(response => response.json())
@@ -300,19 +314,22 @@
             })
             .catch(error => console.error("Error removing teacher:", error));
         }
-    
+        
         function addClassToDepartment() {
             let department = document.getElementById("class-department").value;
             let className = document.getElementById("newClass").value;
-    
+        
             if (!department || !className) {
                 showModal("Both department and class name are required.");
                 return;
             }
-    
-            fetch("/school/add_class_to_department/", {
+        
+            fetch(window.SCHOOL_URLS.addClassToDepartment, {
                 method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRFToken": getCSRFToken() },
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": getCSRFToken()
+                },
                 body: `department=${department}&class_name=${className}`
             })
             .then(response => response.json())
@@ -323,16 +340,17 @@
             })
             .catch(error => console.error("Error adding class:", error));
         }
-    
+        
         function showModal(message) {
             document.querySelector("#confirmationModal .modal-body").innerHTML = message;
             new bootstrap.Modal(document.getElementById("confirmationModal")).show();
         }
-    
+        
         function getCSRFToken() {
             return document.cookie.split('; ').find(row => row.startsWith('csrftoken=')).split('=')[1];
         }
     </script>
+        
     
 
 </body>

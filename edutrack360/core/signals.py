@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.db import transaction
-from core.models import Result, StudentMark, Student
+from core.models import Result, StudentMark, Student, Notification
 
 
 @receiver(post_save, sender=Result)
@@ -43,3 +43,14 @@ def create_or_update_student_mark(sender, instance, created, **kwargs):
         )
 
         print(f"{'Created' if created else 'Updated'} StudentMark for {instance.student} - {instance.subject}")
+
+
+@receiver(post_save, sender=Result)
+def create_notification_for_result_upload(sender, instance, created, **kwargs):
+    """Creates a notification when a teacher uploads results."""
+    if created:  # Only trigger on new result uploads
+        Notification.objects.create(
+            recipient=instance.school.headteacher,  # Assuming school has a headteacher field
+            sender=instance.teacher.user,  # Assuming teacher is linked to a user
+            message=f"{instance.teacher.first_name} {instance.teacher.last_name} uploaded {instance.subject.name} results for {instance.class_group.name}."
+        )

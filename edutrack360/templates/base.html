@@ -1,153 +1,149 @@
+@login_required
+def siso_dashboard(request):
+    user = request.user
 
-<body class="container py-4">
+    # Ensure only SISO users can access
+    if user.role != "siso" or not user.circuit:
+        return redirect("homepage")
 
-    <h2 class="text-center mb-4">Subject Performance Analysis</h2>
+    circuit = user.circuit
+    schools_in_circuit = School.objects.filter(circuit=circuit)
 
-    <div class="row mb-3">
-        <div class="col-md-3">
-            <label for="academicYear" class="form-label">Academic Year</label>
-            <select id="academicYear" class="form-select"></select>
-        </div>
-        <div class="col-md-3">
-            <label for="term" class="form-label">Term</label>
-            <select id="term" class="form-select"></select>
-        </div>
-        <div class="col-md-3">
-            <label for="subject" class="form-label">Subject</label>
-            <select id="subject" class="form-select"></select>
-        </div>
-        <div class="col-md-3">
-            <label for="classGroup" class="form-label">Class Group</label>
-            <select id="classGroup" class="form-select"></select>
-        </div>
-    </div>
+    # Get available academic years and terms
+    filter_options = json.loads(get_available_terms(request).content)
+    available_years = [year["name"] for year in filter_options.get("academic_years", [])]
+    available_terms = [term["name"] for term in filter_options.get("terms", [])]
 
-    <button class="btn btn-primary mb-3" onclick="fetchPerformance()">Load Performance</button>
-    <button class="btn btn-success mb-3" onclick="downloadCSV()">Download Data</button>
+    # ✅ Ensure correct academic year and term are extracted
+    academic_year = request.GET.get("academic_year", "").strip()
+    term = request.GET.get("term", "").strip()
 
-    <!-- Term Performance Table -->
-    <h4>Term Performance</h4>
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Subject</th>
-                <th>Selected Term</th>
-                <th>Previous Term 1</th>
-                <th>Previous Term 2</th>
-            </tr>
-        </thead>
-        <tbody id="termPerformanceTable"></tbody>
-    </table>
+    # ✅ Ensure selected values are valid, else use defaults
+    selected_year = academic_year if academic_year in available_years else filter_options.get("selected_academic_year")
+    selected_term = term if term in available_terms else filter_options.get("selected_term", "Term 1")
 
-    <!-- Yearly Performance Table -->
-    <h4>Yearly Performance</h4>
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Subject</th>
-                <th>Selected Year</th>
-                <th>Previous Year 1</th>
-                <th>Previous Year 2</th>
-            </tr>
-        </thead>
-        <tbody id="yearlyPerformanceTable"></tbody>
-    </table>
+    if not selected_year or not selected_term:
+        return render(request, "dashboards/siso_dashboard.html", {
+            "error": "No academic data available.",
+            "academic_years": available_years,
+            "terms": available_terms,
+        })
 
-    <script>
-        async function loadFilters() {
-            try {
-                const response = await fetch("/teacher/available-terms/");
-                const data = await response.json();
+    # ✅ Apply filters correctly in queries
+    headteacher_results = Result.objects.filter(
+        school__in=schools_in_circuit,
+        academic_year=selected_year,
+        term=selected_term,
+        status="Submitted"
+    )
 
-                populateDropdown("academicYear", data.academic_years, data.selected_academic_year);
-                populateDropdown("term", data.terms);
-            } catch (error) {
-                console.error("Error fetching available terms:", error);
-            }
-        }
+    marks_qs = StudentMark.objects.filter(
+        student__school__in=schools_in_circuit,
+        academic_year=selected_year,
+        term=selected_term,
+        subject__results__status="Submitted"
+    ).distinct()
 
-        function populateDropdown(id, options, selected = null) {
-            const dropdown = document.getElementById(id);
-            dropdown.innerHTML = options.map(opt => 
-                `<option value="${opt.name}" ${opt.name === selected ? "selected" : ""}>${opt.name}</option>`
-            ).join("");
-        }
+    # Dashboard Stats
+    total_schools = schools_in_circuit.count()
+    total_teachers = sum(
+        school.staff_members.filter(role__in=["teacher", "headteacher"]).count()
+        for school in schools_in_circuit
+    )
+    total_students_assessed = marks_qs.values('student').distinct().count()
+    total_circuit_average = marks_qs.aggregate(avg=Avg("mark"))["avg"] or 0
 
-        async function fetchPerformance() {
-            const academicYear = document.getElementById("academicYear").value;
-            const term = document.getElementById("term").value;
-            const subject = document.getElementById("subject").value;
-            const classGroup = document.getElementById("classGroup").value;
+    # ✅ Ensure performance metrics apply correct filters
+    best_performing_schools = list(
+        marks_qs.values("student__school__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("-avg_mark")[:2]
+    )
+    for school in best_performing_schools:
+        school["school"] = school.pop("student__school__name")
+        school["average_score"] = round(school.pop("avg_mark"), 2)
 
-            const baseYear = parseInt(academicYear.split("/")[0]);
-            const previousYears = [`${baseYear - 1}/${baseYear}`, `${baseYear - 2}/${baseYear - 1}`];
+    weakest_performing_schools = list(
+        marks_qs.values("student__school__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("avg_mark")[:2]
+    )
+    for school in weakest_performing_schools:
+        school["school"] = school.pop("student__school__name")
+        school["average_score"] = round(school.pop("avg_mark"), 2)
 
-            const termMapping = {
-                "Term 1": ["Term 2", "Term 3"],
-                "Term 2": ["Term 3", "Term 1"],
-                "Term 3": ["Term 1", "Term 2"]
-            };
-            const previousTerms = termMapping[term] || [];
+    best_performing_subjects = list(
+        marks_qs.values("subject__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("-avg_mark")[:3]
+    )
+    for subject in best_performing_subjects:
+        subject["subject"] = subject.pop("subject__name")
+        subject["average_score"] = round(subject.pop("avg_mark"), 2)
 
-            const url = `/teacher/subject-performance-analysis/?academic_year=${academicYear}&term=${term}&subject=${subject}&class_group=${classGroup}`;
+    weakest_performing_subjects = list(
+        marks_qs.values("subject__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("avg_mark")[:3]
+    )
+    for subject in weakest_performing_subjects:
+        subject["subject"] = subject.pop("subject__name")
+        subject["average_score"] = round(subject.pop("avg_mark"), 2)
 
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
+    # ✅ Performance Trends Data
+    circuit_performance_trends = (
+        marks_qs.values("student__school__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("student__school__name")
+    )
+    trend_data = [
+        {"school": entry["student__school__name"], "score": round(entry["avg_mark"], 2)}
+        for entry in circuit_performance_trends
+    ]
 
-                populateTable("termPerformanceTable", data.term_performance, ["selected_term", "previous_terms"], previousTerms);
-                populateTable("yearlyPerformanceTable", data.academic_performance, ["selected_year", "previous_years"], previousYears);
-            } catch (error) {
-                console.error("Error fetching performance data:", error);
-            }
-        }
+    # ✅ Filtered Notifications
+    notifications = (
+        headteacher_results
+        .values("school__name", "school__headteacher__first_name", "school__headteacher__last_name", "term", "academic_year", "class_group__name", "subject__name")
+        .distinct()
+        .order_by("-academic_year", "-term")[:10]
+    )
 
-        function populateTable(tableId, data, keys, dynamicColumns) {
-            const tableBody = document.getElementById(tableId);
-            tableBody.innerHTML = "";
+    formatted_notifications = [
+        f"{entry['school__headteacher__first_name']} {entry['school__headteacher__last_name']} submitted {entry['class_group__name']} {entry['subject__name']} results for {entry['school__name']} ({entry['term']} {entry['academic_year']})"
+        for entry in notifications
+        if entry["school__headteacher__first_name"] and entry["school__headteacher__last_name"]
+    ]
 
-            Object.entries(data).forEach(([subject, performance]) => {
-                let row = `<tr><td>${subject}</td>`;
-                
-                keys.forEach(key => {
-                    if (typeof performance[key] === "object") {
-                        const values = dynamicColumns.map(col => performance[key][col] || "-");
-                        row += `<td>${values.join("</td><td>")}</td>`;
-                    } else {
-                        row += `<td>${performance[key] || "-"}</td>`;
-                    }
-                });
+    # ✅ Handle AJAX request correctly
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({
+            "total_schools": total_schools,
+            "total_teachers": total_teachers,
+            "total_students_assessed": total_students_assessed,
+            "total_circuit_average": round(total_circuit_average, 2),
+            "best_performing_schools": best_performing_schools,
+            "weakest_performing_schools": weakest_performing_schools,
+            "best_performing_subjects": best_performing_subjects,
+            "weakest_performing_subjects": weakest_performing_subjects,
+            "performance_trends": trend_data,
+            "notifications": formatted_notifications,
+        })
 
-                row += `</tr>`;
-                tableBody.insertAdjacentHTML("beforeend", row);
-            });
-        }
-
-        function downloadCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,";
-            let termTable = document.querySelectorAll("#termPerformanceTable tr");
-            let yearlyTable = document.querySelectorAll("#yearlyPerformanceTable tr");
-
-            csvContent += "Term Performance\nSubject,Selected Term,Previous Term 1,Previous Term 2\n";
-            termTable.forEach(row => {
-                csvContent += Array.from(row.children).map(td => td.textContent).join(",") + "\n";
-            });
-
-            csvContent += "\nYearly Performance\nSubject,Selected Year,Previous Year 1,Previous Year 2\n";
-            yearlyTable.forEach(row => {
-                csvContent += Array.from(row.children).map(td => td.textContent).join(",") + "\n";
-            });
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "performance_data.csv");
-            document.body.appendChild(link);
-            link.click();
-        }
-
-        window.onload = loadFilters;
-    </script>
-
-</body>
-</html>
+    # ✅ Pass selected filters back to the template
+    return render(request, "dashboards/siso_dashboard.html", {
+        "academic_years": available_years,
+        "terms": available_terms,
+        "selected_year": selected_year,
+        "selected_term": selected_term,
+        "total_schools": total_schools,
+        "total_teachers": total_teachers,
+        "total_students_assessed": total_students_assessed,
+        "total_circuit_average": round(total_circuit_average, 2),
+        "best_performing_schools": best_performing_schools,
+        "weakest_performing_schools": weakest_performing_schools,
+        "best_performing_subjects": best_performing_subjects,
+        "weakest_performing_subjects": weakest_performing_subjects,
+        "performance_trends": trend_data,
+        "notifications": formatted_notifications,
+    })

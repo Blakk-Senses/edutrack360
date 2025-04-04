@@ -4,7 +4,8 @@ from django.contrib.auth.hashers import make_password
 from datetime import datetime
 from core.models import (
     Circuit, School, Student, 
-    Subject, ClassGroup, Department, Result, Teacher, User
+    Subject, ClassGroup, Department, Result, Teacher, User,
+    Notification,
 
 )
 from django.contrib.auth.forms import UserCreationForm
@@ -224,3 +225,28 @@ class TeacherRegistrationForm(UserCreationForm):
             user.save()
             Teacher.objects.create(user=user, school=self.school)  
         return user
+
+
+class NotificationForm(forms.ModelForm):
+    recipient = forms.ModelChoiceField(
+        queryset=User.objects.filter(role='Headteacher'),  # Filter based on role if needed
+        required=False,  # Optional if "All" is selected
+        empty_label="Select a Headteacher"
+    )
+    message = forms.CharField(widget=forms.Textarea, required=True)
+    send_to_all = forms.BooleanField(required=False, initial=False, label="Send to All Headteachers")
+
+    class Meta:
+        model = Notification
+        fields = ['recipient', 'message', 'send_to_all']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        send_to_all = cleaned_data.get('send_to_all')
+        recipient = cleaned_data.get('recipient')
+
+        if send_to_all and recipient is not None:
+            raise forms.ValidationError("Cannot select a specific recipient when sending to all Headteachers.")
+        return cleaned_data
+
+

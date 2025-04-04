@@ -945,16 +945,25 @@ def bulk_upload_results(request):
             errors.append({"row": index + 1, "error": f"Invalid term: {term}"})
             continue
 
-        try:
-            class_group = ClassGroup.objects.select_related("department").get(name=class_name)
-        except ClassGroup.DoesNotExist:
-            errors.append({"row": index + 1, "error": f"Invalid class: {class_name}"})
+        # ✅ Fix: Ensure class group belongs to the teacher's school
+        class_group_queryset = ClassGroup.objects.select_related("department").filter(
+            name=class_name,
+            school=teacher_school  # Ensure the class is in the teacher's school
+        )
+
+        if class_group_queryset.count() == 1:
+            class_group = class_group_queryset.first()
+        elif class_group_queryset.count() > 1:
+            errors.append({"row": index + 1, "error": f"Multiple class groups found for '{class_name}' in {teacher_school.name}."})
+            continue
+        else:
+            errors.append({"row": index + 1, "error": f"Invalid class '{class_name}' for school {teacher_school.name}."})
             continue
 
         try:
             subject = Subject.objects.get(name=subject_name, department=class_group.department)
         except Subject.DoesNotExist:
-            errors.append({"row": index + 1, "error": f"Invalid subject '{subject_name}' for class {class_name}"})
+            errors.append({"row": index + 1, "error": f"Invalid subject '{subject_name}' for class {class_name}."})
             continue
 
         if not can_teacher_upload_result(teacher, class_group, subject):
@@ -994,21 +1003,20 @@ def bulk_upload_results(request):
             student.save()
 
         valid_results.append(
-        Result(
-            academic_year=academic_year,
-            class_group=class_group,
-            subject=subject,
-            term=term,
-            student=student,
-            mark=mark,
-            teacher=request.user,
-            school=teacher_school,
-            circuit=teacher_circuit,
-            district=teacher_district,
-            status="Pending"
+            Result(
+                academic_year=academic_year,
+                class_group=class_group,
+                subject=subject,
+                term=term,
+                student=student,
+                mark=mark,
+                teacher=request.user,
+                school=teacher_school,
+                circuit=teacher_circuit,
+                district=teacher_district,
+                status="Pending"
+            )
         )
-    )
-
 
     if valid_results:
         inserted_results = Result.objects.bulk_create(valid_results)

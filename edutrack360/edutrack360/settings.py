@@ -47,7 +47,12 @@ LOGGING = {
 }
 
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "testserver"  # Add this to allow Django test client requests
+]
+
 
 
 # Application definition
@@ -96,6 +101,18 @@ TEMPLATES = [
 WSGI_APPLICATION = 'edutrack360.wsgi.application'
 
 ASGI_APPLICATION = 'edutrack360.asgi.application'
+
+
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
+
 
 
 

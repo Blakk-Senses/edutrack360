@@ -278,7 +278,7 @@ class SubjectTeacher(models.Model):
     )
     assigned_classes = models.ManyToManyField(
         'core.ClassGroup',
-        related_name="subject_teachers_set"  # Changed this to avoid conflict
+        related_name="subject_teachers_set", blank=True  # Changed this to avoid conflict
     )
     managed_by = models.ForeignKey(
         User,
@@ -375,6 +375,9 @@ class SchoolSubmission(models.Model):
         return f"{self.school.name} - {self.status}"
 
 
+from django.utils import timezone
+from datetime import timedelta
+
 class Notification(models.Model):
     sender = models.ForeignKey(
         User, 
@@ -391,9 +394,41 @@ class Notification(models.Model):
     message = models.TextField()
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)  # Field for expiration date
+    is_expired = models.BooleanField(default=False)  # Flag for expired notifications
 
     def __str__(self):
         return f"Notification from {self.sender} to {self.recipient}"
+
+    def save(self, *args, **kwargs):
+        # If expiration is set, ensure it is set based on the created date or a custom expiration period
+        if self.expires_at is None and self.created_at:
+            self.expires_at = self.created_at + timedelta(days=7)  # Set expiration to 7 days from creation
+        super().save(*args, **kwargs)
+
+    def check_expiry(self):
+        """Check if notification is expired based on current time."""
+        if self.expires_at and timezone.now() > self.expires_at:
+            self.is_expired = True
+            self.save()
+
+    @classmethod
+    def get_expired_notifications(cls):
+        """Get all expired notifications."""
+        return cls.objects.filter(is_expired=True)
+    
+    @classmethod
+    def get_active_notifications(cls):
+        """Get all active notifications."""
+        return cls.objects.filter(is_expired=False)
+
+    @classmethod
+    def get_notifications_for_siso(cls, siso_user):
+        """Get all notifications for a specific SISO, including all their assigned headteachers."""
+        # Assuming the SISO user is linked to schools in some way
+        headteachers = siso_user.schools.all()  # Adjust based on the real relation
+        return cls.objects.filter(recipient__in=headteachers)
+
 
 
 class PerformanceSummary(models.Model):

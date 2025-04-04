@@ -208,33 +208,41 @@ body {
 
 /* Assigning both border and text color */
 .total-students-assessed {
-    border-left-color: #22027c; /* Green */
-    color: #22027c;
+    border-left-color: #02377c; /* Green */
+    color: #02377c;
 }
 
 .total-teachers {
     border-left-color: #035db1; /* Blue */
     color: #035db1;
 }
-
-.average-school-performance {
-    border-left-color: #028593; /* Cyan */
-    color: #028593;
+.total-schools {
+    border-left-color: #004d40; /* Blue */
+    color: #004d40;
 }
 
-.best-performing-subjects {
+.average-circuit-performance {
+    border-left-color: #027c5b; /* Cyan */
+    color: #027c5b;
+}
+
+.top-performing-subjects {
     border-left-color: #089d2a; /* Green */
     color: #089d2a;
 }
 
-.weakest-performing-subjects {
+.bottom-performing-subjects {
     border-left-color: #DC3545; /* Red */
     color: #DC3545;
 }
 
-.best-performing-classes {
-    border-left-color: #6904b2; /* Purple */
-    color: #6904b2;
+.best-performing-schools {
+    border-left-color: #03926e; /* Purple */
+    color: #03926e;
+}
+.weakest-performing-schools {
+    border-left-color: #b20432; /* Purple */
+    color: #b20432;
 }
 
 .navbar {
@@ -297,102 +305,66 @@ body {
     font-size: 22px;
 }
 
-/* Adjusted notification container for smoother user experience */
 .notification-container {
     position: relative;
     display: inline-block;
-    cursor: pointer;
 }
 
-/* Notification icon styles */
-#notificationBell {
-    font-size: 24px; /* Icon size */
+.btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
     position: relative;
-    cursor: pointer;
 }
 
-/* Badge (unread notifications count) */
-#notificationCount {
+.badge {
+    background: red;
+    color: white;
+    font-size: 12px;
+    border-radius: 50%;
+    padding: 5px;
     position: absolute;
     top: -5px;
     right: -5px;
-    background-color: red;
-    color: white;
-    font-size: 12px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    text-align: center;
-    line-height: 20px;
-    display: none;  /* Hidden by default */
+    display: none;
 }
 
-/* Dropdown styles */
-#notificationDropdown {
-    display: none;  /* Hidden initially */
+.dropdown-menu {
+    display: none;
     position: absolute;
-    top: 100%;
     right: 0;
-    width: 300px; /* Adjust width */
-    background-color: white;
+    background: white;
     border: 1px solid #ddd;
-    border-radius: 5px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-    z-index: 1000;
-    max-height: 350px;  /* Limit height */
-    overflow-y: auto;   /* Scroll if too many notifications */
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(10px);  /* Start with slight offset for animation */
-    transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
+    box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+    width: 250px;
+    max-height: 300px;
+    overflow-y: auto;
 }
 
-/* Show dropdown when active */
-#notificationDropdown.show {
+.dropdown-menu.show {
     display: block;
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0); /* Smooth dropdown animation */
 }
 
-/* Notification list styling */
-#notificationList {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-/* Notification item */
 .notification-item {
     padding: 10px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid #eee;
     cursor: pointer;
 }
 
-/* Hover effect */
 .notification-item:hover {
-    background-color: #f9f9f9;
+    background: #f5f5f5;
 }
 
-/* Unread notification styling */
-.notification-item.unread {
-    font-weight: bold;
-    background-color: #f0f8ff; /* Light blue background for unread */
-}
-
-/* Footer with link */
 .dropdown-footer {
-    padding: 10px;
     text-align: center;
-    background-color: #f8f8f8;
-    border-top: 1px solid #ddd;
+    padding: 10px;
+    background: #f9f9f9;
 }
 
-.dropdown-footer a {
-    color: #007bff;
-    text-decoration: none;
+.no-notifications {
+    text-align: center;
+    padding: 10px;
+    color: #777;
 }
 
-.dropdown-footer a:hover {
-    text-decoration: underline;
-}

@@ -17,7 +17,21 @@
         </a>
         </div>
         <div class="navbar-icons">
-            <i class="fas fa-bell"></i>
+            <div class="notification-container">
+                <!-- Notification Bell Icon -->
+                <button id="notificationBell" class="btn">
+                    <i class="fa fa-bell"></i>
+                    <span id="notificationCount" class="badge">0</span>
+                </button>
+            
+                <!-- Dropdown Menu -->
+                <div id="notificationDropdown" class="dropdown-menu">
+                    <ul id="notificationList">Loading...</ul>
+                    <div class="dropdown-footer">
+                        <a href="#">View all</a>
+                    </div>
+                </div>
+            </div>
             <i class="fas fa-user-circle"></i>
             <span class="welcome-text">Welcome, {{ user.first_name }}</span>
         </div>
@@ -48,7 +62,7 @@
             <i class="fas fa-file-upload"></i>
             <span class="tooltip">Submit Results</span>
         </a>
-        <a href="{% url 'logout' %}" class="logout-link">
+        <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link">
             <i class="fas fa-sign-out-alt"></i>
             <span class="tooltip">Logout</span>
         </a>
@@ -117,7 +131,7 @@
                 </div>
     
                 <!-- Best Subjects -->
-                <div class="col-md-12">
+                <div class="col-md-6">
                     <div class="dashboard-card best-performing-subjects">
                         <div>
                             <h3>Top Performing Subjects</h3>
@@ -139,7 +153,7 @@
                 </div>
     
                 <!-- Best Classes -->
-                <div class="col-md-6">
+                <div class="col-md-12">
                     <div class="dashboard-card best-performing-classes">
                         <div>
                             <h3>Top Performing Classes</h3>
@@ -173,7 +187,26 @@
             </div>
         </div>
     </div>
-    
+    <!-- Logout Confirmation Modal -->
+    <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-center p-4 rounded-4 shadow-lg">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <i class="fa fa-exclamation-circle text-warning" style="font-size: 50px;"></i>
+                    </div>
+                    <h4 class="fw-bold">Are you sure?</h4>
+                    <p class="text-muted">You want to logout of the system?</p>
+                </div>
+                <div class="modal-footer border-0 d-flex justify-content-center">
+                    <button type="button" class="btn btn-danger px-4 py-2 rounded-pill" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success px-4 py-2 rounded-pill" id="confirmLogout">Logout!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <!-- JS Dependencies -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -273,10 +306,91 @@
 
         // Initial load
         $(document).ready(fetchHeadteacherDashboardData);
+
+        function fetchHeadteacherNotifications() {
+            $.ajax({
+                url: "{% url 'school:get_headteacher_notifications' %}",  // Update URL to fetch notifications for Headteacher
+                method: "GET",
+                success: function (response) {
+                    const notificationList = $("#notificationList");
+                    const notificationCount = $("#notificationCount");
+
+                    notificationList.empty();
+
+                    if (response.notifications.length > 0) {
+                        response.notifications.forEach(notification => {
+                            const li = `<li data-id="${notification.id}" class="notification-item">
+                                ${notification.message} <br>
+                                <small>${notification.sent_at}</small>
+                            </li>`;
+                            notificationList.append(li);
+                        });
+
+                        notificationCount.text(response.notifications.length).show();
+                    } else {
+                        notificationList.append('<li class="no-notifications">No new notifications</li>');
+                        notificationCount.hide();
+                    }
+                },
+                error: function () {
+                    console.error("Error fetching notifications.");
+                }
+            });
+        }
+
+        // Mark notification as read
+        $(document).on("click", ".notification-item", function () {
+            const notificationId = $(this).data("id");
+            const notificationItem = $(this);
+
+            $.ajax({
+                url: `/school/notifications/mark-as-read/${notificationId}/`,  // URL for marking notification as read
+                method: "POST",
+                headers: { "X-CSRFToken": "{{ csrf_token }}" },
+                success: function () {
+                    notificationItem.fadeOut(300, function () {
+                        $(this).remove();
+                        fetchHeadteacherNotifications();  // Re-fetch notifications after marking one as read
+                    });
+                },
+                error: function () {
+                    console.error("Failed to mark notification as read.");
+                }
+            });
+        });
+
+        setInterval(fetchHeadteacherNotifications, 30000);  // Fetch notifications every 30 seconds
+
+        // Toggle notifications dropdown
+        $("#notificationBell").click(function (event) {
+            event.stopPropagation();
+            $("#notificationDropdown").toggleClass("show");
+        });
+
+        $(document).click(function (event) {
+            if (!$(event.target).closest(".notification-container").length) {
+                $("#notificationDropdown").removeClass("show");
+            }
+        });
+
+
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const logoutBtn = document.getElementById("logoutBtn");
+            const confirmLogout = document.getElementById("confirmLogout");
+            const logoutUrl = logoutBtn.getAttribute("data-logout-url");
+
+            const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
+
+            logoutBtn.addEventListener("click", function (e) {
+                e.preventDefault();
+                logoutModal.show();
+            });
+
+            confirmLogout.addEventListener("click", function () {
+                window.location.href = logoutUrl;
+            });
+        });
     </script>
-
-    
-    
-
 </body>
 </html>
