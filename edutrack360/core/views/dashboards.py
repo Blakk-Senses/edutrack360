@@ -127,11 +127,11 @@ def siso_dashboard(request):
     available_years = [year["name"] for year in filter_options.get("academic_years", [])]
     available_terms = [term["name"] for term in filter_options.get("terms", [])]
 
-    # ✅ Ensure correct academic year and term are extracted
+    # Ensure correct academic year and term are extracted
     academic_year = request.GET.get("academic_year", "").strip()
     term = request.GET.get("term", "").strip()
 
-    # ✅ Ensure selected values are valid, else use defaults
+    # Ensure selected values are valid, else use defaults
     selected_year = academic_year if academic_year in available_years else filter_options.get("selected_academic_year")
     selected_term = term if term in available_terms else filter_options.get("selected_term", "Term 1")
 
@@ -142,19 +142,12 @@ def siso_dashboard(request):
             "terms": available_terms,
         })
 
-    # ✅ Apply filters correctly in queries
-    headteacher_results = Result.objects.filter(
-        school__in=schools_in_circuit,
-        academic_year=selected_year,
-        term=selected_term,
-        status="Submitted"
-    )
-
+    # Apply filters correctly in queries for marks
     marks_qs = StudentMark.objects.filter(
-        student__school__in=schools_in_circuit,
-        academic_year=selected_year,
-        term=selected_term,
-        subject__results__status="Submitted"
+        student__school__in=schools_in_circuit,  # Filter by schools in the circuit
+        academic_year=selected_year,  # Filter by academic year
+        term=selected_term,  # Filter by term
+        subject__results__status="Submitted"  # Only include submitted results
     ).distinct()
 
     # Dashboard Stats
@@ -166,7 +159,7 @@ def siso_dashboard(request):
     total_students_assessed = marks_qs.values('student').distinct().count()
     total_circuit_average = marks_qs.aggregate(avg=Avg("mark"))["avg"] or 0
 
-    # ✅ Ensure performance metrics apply correct filters
+    # Best and weakest performing schools
     best_performing_schools = list(
         marks_qs.values("student__school__name")
         .annotate(avg_mark=Avg("mark"))
@@ -185,6 +178,7 @@ def siso_dashboard(request):
         school["school"] = school.pop("student__school__name")
         school["average_score"] = round(school.pop("avg_mark"), 2)
 
+    # Best and weakest performing subjects
     best_performing_subjects = list(
         marks_qs.values("subject__name")
         .annotate(avg_mark=Avg("mark"))
@@ -203,7 +197,7 @@ def siso_dashboard(request):
         subject["subject"] = subject.pop("subject__name")
         subject["average_score"] = round(subject.pop("avg_mark"), 2)
 
-    # ✅ Performance Trends Data
+    # Performance Trends Data
     circuit_performance_trends = (
         marks_qs.values("student__school__name")
         .annotate(avg_mark=Avg("mark"))
@@ -214,7 +208,14 @@ def siso_dashboard(request):
         for entry in circuit_performance_trends
     ]
 
-    # ✅ Filtered Notifications
+    # Filtered Notifications
+    headteacher_results = Result.objects.filter(
+        school__in=schools_in_circuit,
+        academic_year=selected_year,
+        term=selected_term,
+        status="Submitted"
+    )
+
     notifications = (
         headteacher_results
         .values("school__name", "school__headteacher__first_name", "school__headteacher__last_name", "term", "academic_year", "class_group__name", "subject__name")
@@ -228,7 +229,7 @@ def siso_dashboard(request):
         if entry["school__headteacher__first_name"] and entry["school__headteacher__last_name"]
     ]
 
-    # ✅ Handle AJAX request correctly
+    # Handle AJAX request correctly
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse({
             "total_schools": total_schools,
@@ -243,7 +244,7 @@ def siso_dashboard(request):
             "notifications": formatted_notifications,
         })
 
-    # ✅ Pass selected filters back to the template
+    # Pass selected filters back to the template
     return render(request, "dashboards/siso_dashboard.html", {
         "academic_years": available_years,
         "terms": available_terms,
@@ -260,6 +261,7 @@ def siso_dashboard(request):
         "performance_trends": trend_data,
         "notifications": formatted_notifications,
     })
+
 
 
 

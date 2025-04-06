@@ -50,7 +50,8 @@ LOGGING = {
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
-    "testserver"  # Add this to allow Django test client requests
+    "testserver",
+    "192.168.109.165",
 ]
 
 

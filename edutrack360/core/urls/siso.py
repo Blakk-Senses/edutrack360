@@ -3,6 +3,7 @@ from django.urls import path
 from core.views.view_siso import (
     circuit_performance_analysis, circuit_overview, notifications,
     get_notifications,mark_notification_as_read, get_headteachers_by_circuit,
+    download_circuit_performance_pdf,
 
 )
 
@@ -13,7 +14,7 @@ urlpatterns = [
 
     path('circuit/overview/', circuit_overview, name='circuit_overview'),
     path('circuit/performance/analysis/', circuit_performance_analysis, name='circuit_performance_analysis'),
-    #path('performance/download/', download_circuit_performance_pdf, name='download_circuit_performance_pdf'),
+    path('performance/download/', download_circuit_performance_pdf, name='download_circuit_performance_pdf'),
 
 
 
