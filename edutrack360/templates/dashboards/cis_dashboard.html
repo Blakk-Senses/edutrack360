@@ -11,21 +11,37 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
-  <div class="navbar">
-      <div class="logo">
-        <a href="{% url 'dashboards:cis_dashboard' %}" class="href">
-          <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
-        </a>
-      </div>
-      <div class="navbar-icons">
-          <i class="fas fa-bell"></i>
-          <i class="fas fa-user-circle"></i>
-          <span class="welcome-text">Welcome , Chief Inspector {{ user.first_name }}</span>
-      </div>
+    <div class="navbar">
+        <div class="logo">
+            <a href="{% url 'dashboards:cis_dashboard' %}" class="href">
+            <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
+            </a>
+        </div>
+        <div class="navbar-icons">
+            <div class="notification-container">
+                <!-- Notification Bell Icon -->
+                <button id="notificationBell" class="btn">
+                    <i class="fa fa-bell"></i>
+                    <span id="notificationCount" class="badge" style="display: none;">0</span>
+                </button>
+            
+                <!-- Dropdown Menu -->
+                <div id="notificationDropdown" class="dropdown-menu">
+                    <ul id="notificationList">
+                        <li class="loading">Loading...</li>
+                    </ul>
+                    <div class="dropdown-footer">
+                        <a href="#">View all</a>
+                    </div>
+                </div>
+            </div>
+            <i class="fas fa-user-circle"></i>
+            <span class="welcome-text">Welcome , Chief Inspector {{ user.first_name }}</span>
+        </div>
+        </div>
+        
     </div>
     
-  </div>
-  
     <div class="sidebar">
         <a href="{% url 'dashboards:cis_dashboard' %}">
             <i class="fas fa-tachometer-alt"></i>
@@ -39,9 +55,9 @@
             <i class="fas fa-tasks"></i>
             <span class="tooltip">SISO Management</span>
         </a>
-        <a href="{% url 'cis:generate_reports' %}">
+        <a href="{% url 'cis:district_performance_analysis' %}">
             <i class="fas fa-file-alt"></i>
-            <span class="tooltip">Generate Reports</span>
+            <span class="tooltip">Performance Analysis</span>
         </a>
         <a href="{% url 'cis:send_notification' %}">
             <i class="fas fa-bell"></i>
@@ -51,111 +67,147 @@
             <i class="fas fa-users-cog"></i>
             <span class="tooltip">User Management</span>
         </a>
-        
-        </a>
-        <a href="{% url 'logout_prompt' %}" class="logout-link">
+        <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link">
             <i class="fas fa-sign-out-alt"></i>
             <span class="tooltip">Logout</span>
         </a>
     </div>
 
     <div class="main-content">
-        <div class="dashboard-header text-center text-md-start" style="margin-bottom: 0px; padding: 2px 0;">
-            <h4 class="fw-bold" style="margin: 0;">
-                {{ request.user.district|default:"Your" }} District Dashboard
-            </h4>
-        </div>
-        <div class="container" style="margin-top: 0px;">
-            <div class="row g-2">
-                <!-- Existing Cards -->
+        <div class="container mt-4">
+            <div class="dashboard-header text-center text-md-start" style="margin-bottom: 0px; padding: 2px 0;">
+                <h3 class="fw-bold" style="margin: 0;">
+                    {{ request.user.district.name }} District Dashboard
+                </h3>
+            </div>
+            <!-- Filters -->
+            <div class="row g-3 mb-4 align-items-end">
                 <div class="col-md-6">
+                    <label for="yearFilter" class="form-label">Academic Year</label>
+                    <select id="yearFilter" class="form-control">
+                        {% for year in academic_years %}
+                            <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="termFilter" class="form-label">Term</label>
+                    <select id="termFilter" class="form-control">
+                        {% for t in terms %}
+                            <option value="{{ t }}" {% if t == selected_term %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+    
+            <!-- Dashboard Metrics -->
+            <div class="row g-3">
+                <!-- Total Schools -->
+                <div class="col-md-3">
                     <div class="dashboard-card total-schools">
                         <div>
                             <h3>Total Schools in District</h3>
-                            <p class="value">{{ total_schools|default:"0" }}</p>
+                            <p class="value">0</p>
                         </div>
                         <div class="icon"><i class="fas fa-school"></i></div>
                     </div>
                 </div>
-                
-                <div class="col-md-6">
+    
+                <!-- Total Teachers -->
+                <div class="col-md-3">
                     <div class="dashboard-card total-teachers">
                         <div>
                             <h3>Total Teachers in District</h3>
-                            <p class="value">{{ total_teachers|default:"0" }}</p>
+                            <p class="value">0</p>
                         </div>
                         <div class="icon"><i class="fas fa-chalkboard-teacher"></i></div>
                     </div>
                 </div>
                 
-                <div class="col-md-6">
+                <!-- Total Students Assessed -->
+                <div class="col-md-3">
+                    <div class="dashboard-card total-students-assessed">
+                        <div>
+                            <h3>Total Students Assessed</h3>
+                            <p class="value">0</p>
+                        </div>
+                        <div class="icon"><i class="fas fa-users"></i></div>
+                    </div>
+                </div>
+    
+                <!-- Circuit Avg Performance -->
+                <div class="col-md-3">
                     <div class="dashboard-card average-district-performance">
                         <div>
                             <h3>Average District Performance</h3>
-                            <p class="value">{{ avg_district_performance|default:"0%" }}</p>
+                            <p class="value">0%</p>
                         </div>
-                        <div class="icon"><i class="fas fa-chart-bar"></i></div>
+                            <div class="icon"><i class="fas fa-chart-line"></i></div>
                     </div>
                 </div>
-                
+    
+                <!-- Best Performing Schools -->
                 <div class="col-md-6">
-                    <div class="dashboard-card active-siso-tasks">
+                    <div class="dashboard-card best-performing-schools">
                         <div>
-                            <h3>Active SISO Tasks</h3>
-                            <p class="value">{{ active_siso_tasks|default:"0" }}</p>
+                            <h3>Best Performing Schools</h3>
+                            <ul class="value"></ul>
                         </div>
-                        <div class="icon"><i class="fas fa-tasks"></i></div>
+                        <div class="icon"><i class="fas fa-medal"></i></div> <!-- Change to 'fa-medal' for best performance -->
                     </div>
                 </div>
 
-                <!-- District Performance Trends -->
+                <!-- Weakest Performing Schools -->
+                <div class="col-md-6">
+                    <div class="dashboard-card weakest-performing-schools">
+                        <div>
+                            <h3>Weakest Performing Schools</h3>
+                            <ul class="value"></ul>
+                        </div>
+                        <div class="icon"><i class="fas fa-sad-tear"></i></div> <!-- Change to 'fa-sad-tear' for weakest performance -->
+                    </div>
+                </div>
+
+                <!-- Top Performing Subjects -->
+                <div class="col-md-6">
+                    <div class="dashboard-card top-performing-subjects">
+                        <div>
+                            <h3>Top Performing Subjects</h3>
+                            <ul class="value"></ul>
+                        </div>
+                        <div class="icon"><i class="fas fa-trophy"></i></div> <!-- 'fa-chalkboard-teacher' is good for subjects -->
+                    </div>
+                </div>
+
+                <!-- Bottom Performing Subjects -->
+                <div class="col-md-6">
+                    <div class="dashboard-card bottom-performing-subjects">
+                        <div>
+                            <h3>Bottom Performing Subjects</h3>
+                            <ul class="value"></ul>
+                        </div>
+                        <div class="icon"><i class="fas fa-skull-crossbones"></i></div> <!-- 'fa-skull-crossbones' for worst performance -->
+                    </div>
+                </div>
+
+    
+                <!-- Circuit Performance Trend Chart -->
                 <div class="col-md-12">
                     <div class="custom-card">
-                        <div class="card-header">Performance Trends</div>
+                        <div class="card-header">District Performance Trends</div>
                         <div class="card-body">
                             <canvas id="performanceTrendsChart"></canvas>
                         </div>
                     </div>
                 </div>
-        
-                <!-- Top Performing Schools -->
+    
+                <!-- Notifications -->
                 <div class="col-md-12">
                     <div class="custom-card">
-                        <div class="card-header">Top Performing Schools</div>
+                        <div class="card-header">Recent Uploads</div>
                         <div class="card-body">
-                            <ul class="list-group">
-                                {% for school in top_schools %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    {{ school.name }}
-                                    <span class="badge badge-primary badge-pill">{{ school.performance_score }}%</span>
-                                </li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-        
-                <!-- District Summary -->
-                <div class="col-md-12">
-                    <div class="custom-card">
-                        <div class="card-header">District Summary</div>
-                        <div class="card-body">
-                            <p>{{ district_summary }}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Active SISOs -->
-                <div class="col-md-12">
-                    <div class="custom-card">
-                        <div class="card-header">Active SISOs</div>
-                        <div class="card-body">
-                            <ul class="list-group">
-                                {% for siso in active_sisos %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    {{ siso.name }}
-                                </li>
-                                {% endfor %}
+                            <ul class="recent-uploads value">
+                                <li>Loading...</li>
                             </ul>
                         </div>
                     </div>
@@ -164,50 +216,205 @@
         </div>
     </div>
     
-    <!-- Chart.js Script -->
+    <!-- Logout Confirmation Modal -->
+    <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-center p-4 rounded-4 shadow-lg">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <i class="fa fa-exclamation-circle text-warning" style="font-size: 50px;"></i>
+                    </div>
+                    <h4 class="fw-bold">Are you sure?</h4>
+                    <p class="text-muted">You want to logout of the system?</p>
+                </div>
+                <div class="modal-footer border-0 d-flex justify-content-center">
+                    <button type="button" class="btn btn-danger px-4 py-2 rounded-pill" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success px-4 py-2 rounded-pill" id="confirmLogout">Logout!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- JS Dependencies -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <script>
-        // Get data safely
-        var performanceLabels = JSON.parse(document.getElementById('performance-labels').textContent);
-        var performanceData = JSON.parse(document.getElementById('performance-data').textContent);
-
-        // Setup the Performance Trends Chart
-        var ctx = document.getElementById("performanceTrendsChart").getContext("2d");
-        var performanceTrendsChart = new Chart(ctx, {
-            type: 'line',
+        function formatPercent(value) {
+            return value !== null && !isNaN(value) ? parseFloat(value).toFixed(2) + "%" : "N/A";
+        }
+    
+        function updateList(selector, data, placeholderText) {
+            const html = data.length
+                ? data.map(item => `<li>${item.name || item.school || item.subject} (${formatPercent(item.average_score || item.score)})</li>`).join("")
+                : `<li>${placeholderText}</li>`;
+            $(selector).html(html);
+        }
+    
+        function fetchSISODashboardData() {
+            const academic_year = $("#yearFilter").val();
+            const term = $("#termFilter").val();
+    
+            $.ajax({
+                url: "{% url 'dashboards:cis_dashboard' %}",
+                data: { academic_year, term },
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                method: "GET",
+                success: function (data) {
+                    $(".total-schools .value").text(data.total_schools || 0);
+                    $(".total-teachers .value").text(data.total_teachers || 0);
+                    $(".total-students-assessed .value").text(data.total_students_assessed || 0);
+                    $(".average-district-performance .value").text(formatPercent(data.total_district_average));
+    
+                    updateList(".best-performing-schools .value", data.best_performing_schools, "No data available");
+                    updateList(".weakest-performing-schools .value", data.weakest_performing_schools, "No data available");
+                    updateList(".top-performing-subjects .value", data.best_performing_subjects, "No data available");
+                    updateList(".bottom-performing-subjects .value", data.weakest_performing_subjects, "No data available");
+    
+                    const notifHtml = data.notifications.length
+                        ? data.notifications.map(n => `<li>${n}</li>`).join("")
+                        : "<li>No recent uploads</li>";
+                    $(".recent-uploads").html(notifHtml);
+    
+                    updateTrendChart(data.performance_trends);
+                },
+                error: function () {
+                    console.error("Error fetching SISO dashboard data.");
+                }
+            });
+        }
+    
+        // Chart Initialization
+        const ctx = document.getElementById("performanceTrendsChart").getContext("2d");
+        const trendChart = new Chart(ctx, {
+            type: "bar",
             data: {
-                labels: performanceLabels,
+                labels: [],
                 datasets: [{
-                    label: 'Performance',
-                    data: performanceData,
-                    backgroundColor: 'rgba(78, 115, 223, 0.1)',
-                    borderColor: 'rgba(78, 115, 223, 1)',
-                    borderWidth: 2
+                    label: "Average Score by School",
+                    data: [],
+                    backgroundColor: "rgba(54, 162, 235, 0.6)",
+                    borderColor: "rgba(54, 162, 235, 1)",
+                    borderWidth: 1
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
                 scales: {
-                    x: {
-                        ticks: {
-                            color: "rgba(234, 236, 244, 1)"
-                        },
-                        grid: {
-                            display: false
-                        }
-                    },
                     y: {
-                        ticks: {
-                            color: "rgba(234, 236, 244, 1)"
-                        },
-                        grid: {
-                            color: "rgba(234, 236, 244, 1)"
-                        }
+                        beginAtZero: true,
+                        max: 100,
+                        title: { display: true, text: "Average Score (%)" }
+                    },
+                    x: {
+                        title: { display: true, text: "School" }
                     }
                 }
             }
+        });
+    
+        function updateTrendChart(trendData) {
+            trendChart.data.labels = trendData.map(e => e.school);
+            trendChart.data.datasets[0].data = trendData.map(e => e.score);
+            trendChart.update();
+        }
+    
+        $(document).ready(function () {
+            fetchSISODashboardData();  // Initial load
+    
+            // Re-fetch data when filters change
+            $("#yearFilter, #termFilter").change(function () {
+                fetchSISODashboardData();
+            });
+    
+            $(document).ready(function () {
+                function fetchSISONotifications() {
+                    $.ajax({
+                        url: "{% url 'cis:get_notifications' %}",
+                        method: "GET",
+                        success: function (response) {
+                            const notificationList = $("#notificationList");
+                            const notificationCount = $("#notificationCount");
+
+                            notificationList.empty();
+
+                            if (response.notifications.length > 0) {
+                                response.notifications.forEach(notification => {
+                                    const li = `<li data-id="${notification.id}" class="notification-item">
+                                        ${notification.message} <br>
+                                        <small>${notification.created_at}</small>
+                                    </li>`;
+                                    notificationList.append(li);
+                                });
+
+                                notificationCount.text(response.notifications.length).show();
+                            } else {
+                                notificationList.append('<li class="no-notifications">No new notifications</li>');
+                                notificationCount.hide();
+                            }
+                        },
+                        error: function () {
+                            console.error("Error fetching notifications.");
+                        }
+                    });
+                }
+
+                // Mark notification as read
+                $(document).on("click", ".notification-item", function () {
+                    const notificationId = $(this).data("id");
+                    const notificationItem = $(this);
+
+                    $.ajax({
+                        url: `/cis/notifications/mark-as-read/${notificationId}/`,
+                        method: "POST",
+                        headers: { "X-CSRFToken": "{{ csrf_token }}" },
+                        success: function () {
+                            notificationItem.fadeOut(300, function () {
+                                $(this).remove();
+                                fetchSISONotifications();
+                            });
+                        },
+                        error: function () {
+                            console.error("Failed to mark notification as read.");
+                        }
+                    });
+                });
+
+                // Polling for new notifications
+                setInterval(fetchSISONotifications, 30000);
+
+                // Toggle notifications dropdown
+                $("#notificationBell").click(function (event) {
+                    event.stopPropagation();
+                    $("#notificationDropdown").toggleClass("show");
+                });
+
+                // Close dropdown when clicking outside
+                $(document).click(function (event) {
+                    if (!$(event.target).closest(".notification-container").length) {
+                        $("#notificationDropdown").removeClass("show");
+                    }
+                });
+
+                // Fetch notifications on page load
+                fetchSISONotifications();
+            });
+
+    
+            // Handle logout logic
+            const logoutBtn = document.getElementById("logoutBtn");
+            const confirmLogout = document.getElementById("confirmLogout");
+            const logoutUrl = logoutBtn.getAttribute("data-logout-url");
+            const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
+    
+            logoutBtn.addEventListener("click", function (e) {
+                e.preventDefault();
+                logoutModal.show();
+            });
+    
+            confirmLogout.addEventListener("click", function () {
+                window.location.href = logoutUrl;
+            });
         });
     </script>
 

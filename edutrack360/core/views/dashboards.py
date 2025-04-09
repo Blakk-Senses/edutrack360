@@ -25,88 +25,157 @@ def admin_dashboard(request):
 
 #------------ CIS DASHBOARD -----------------------
 
-@login_required(login_url=lambda: reverse_lazy('dashboards:cis_dashboard'))
+@login_required
 def cis_dashboard(request):
-    district = None  # Initialize district
-    district_name = 'Unknown'
+    user = request.user
 
-    # Check if the user has the role 'cis'
-    if hasattr(request.user, 'assigned_district') and request.user.role == 'cis':
-        # Get the district assigned to the user
-        district = request.user.assigned_district
-        district_name = district.name if district else "Unknown"
+    # Ensure only CIS users can access
+    if user.role != "cis" or not user.district:
+        return redirect("homepage")
 
-    # Total schools in the district
-    total_schools = district.schools_in_districts.count() if district else 0
+    district = user.district
+    schools_in_district = School.objects.filter(district=district)
 
-    # Total number of teachers and headteachers in the district
-    total_teachers = User.objects.filter(
-        school__district=district,  # Directly link to school and then district
-        role__in=['teacher', 'headteacher']
-    ).count() if district else 0
+    # Get available academic years and terms
+    filter_options = json.loads(get_available_terms(request).content)
+    available_years = [year["name"] for year in filter_options.get("academic_years", [])]
+    available_terms = [term["name"] for term in filter_options.get("terms", [])]
 
-    # Aggregated district-level performance
-    district_performance = (
-        PerformanceSummary.objects.filter(district=district).aggregate(average_grade=Avg('average_score'))
-        if district
-        else {'average_grade': None}
+    # Ensure correct academic year and term are extracted
+    academic_year = request.GET.get("academic_year", "").strip()
+    term = request.GET.get("term", "").strip()
+
+    # Ensure selected values are valid, else use defaults
+    selected_year = academic_year if academic_year in available_years else filter_options.get("selected_academic_year")
+    selected_term = term if term in available_terms else filter_options.get("selected_term", "Term 1")
+
+    if not selected_year or not selected_term:
+        return render(request, "dashboards/cis_dashboard.html", {
+            "error": "No academic data available.",
+            "academic_years": available_years,
+            "terms": available_terms,
+        })
+
+    # Apply filters correctly in queries for marks
+    marks_qs = StudentMark.objects.filter(
+        student__school__in=schools_in_district,  # Filter by schools in the district
+        academic_year=selected_year,  # Filter by academic year
+        term=selected_term,  # Filter by term
+        subject__results__status="Submitted"  # Only include submitted results
+    ).distinct()
+
+    # Dashboard Stats
+    total_schools = schools_in_district.count()
+    total_teachers = sum(
+        school.staff_members.filter(role__in=["teacher", "headteacher"]).count()
+        for school in schools_in_district
+    )
+    total_students_assessed = marks_qs.values('student').distinct().count()
+    total_district_average = marks_qs.aggregate(avg=Avg("mark"))["avg"] or 0
+
+    # Best and weakest performing schools
+    best_performing_schools = list(
+        marks_qs.values("student__school__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("-avg_mark")[:5]
+    )
+    for school in best_performing_schools:
+        school["school"] = school.pop("student__school__name")
+        school["average_score"] = round(school.pop("avg_mark"), 2)
+
+    weakest_performing_schools = list(
+        marks_qs.values("student__school__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("avg_mark")[:5]
+    )
+    for school in weakest_performing_schools:
+        school["school"] = school.pop("student__school__name")
+        school["average_score"] = round(school.pop("avg_mark"), 2)
+
+    # Best and weakest performing subjects
+    best_performing_subjects = list(
+        marks_qs.values("subject__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("-avg_mark")[:5]
+    )
+    for subject in best_performing_subjects:
+        subject["subject"] = subject.pop("subject__name")
+        subject["average_score"] = round(subject.pop("avg_mark"), 2)
+
+    weakest_performing_subjects = list(
+        marks_qs.values("subject__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("avg_mark")[:5]
+    )
+    for subject in weakest_performing_subjects:
+        subject["subject"] = subject.pop("subject__name")
+        subject["average_score"] = round(subject.pop("avg_mark"), 2)
+
+    # Performance Trends Data
+    district_performance_trends = (
+        marks_qs.values("student__school__name")
+        .annotate(avg_mark=Avg("mark"))
+        .order_by("student__school__name")
+    )
+    trend_data = [
+        {"school": entry["student__school__name"], "score": round(entry["avg_mark"], 2)}
+        for entry in district_performance_trends
+    ]
+
+    # Filtered Notifications
+    headteacher_results = Result.objects.filter(
+        school__in=schools_in_district,
+        academic_year=selected_year,
+        term=selected_term,
+        status="Submitted"
     )
 
-    # Performance data over years
-    performance_data = (
-        PerformanceSummary.objects.filter(district=district)
-        .values('year')
-        .annotate(average_grade=Avg('average_score'))
-        if district
-        else []
+    notifications = (
+        headteacher_results
+        .values("school__name", "school__headteacher__first_name", "school__headteacher__last_name", "term", "academic_year", "class_group__name", "subject__name")
+        .distinct()
+        .order_by("-academic_year", "-term")[:10]
     )
 
-    # Top-performing schools
-    top_schools = (
-        School.objects.filter(district=district)
-        .annotate(performance_score=Avg('performance_summaries__average_score'))
-        .order_by('-performance_score')[:10]
-        if district
-        else []
-    )
+    formatted_notifications = [
+        f"{entry['school__headteacher__first_name']} {entry['school__headteacher__last_name']} submitted {entry['class_group__name']} {entry['subject__name']} results for {entry['school__name']} ({entry['term']} {entry['academic_year']})"
+        for entry in notifications
+        if entry["school__headteacher__first_name"] and entry["school__headteacher__last_name"]
+    ]
 
-    # Submission status counts
-    if district:
-        successful_submissions = SchoolSubmission.objects.filter(school__district=district, status='submitted').count()
-        pending_submissions = SchoolSubmission.objects.filter(school__district=district, status='pending').count()
-        not_submitted = SchoolSubmission.objects.filter(school__district=district, status='not_submitted').count()
-    else:
-        successful_submissions = pending_submissions = not_submitted = 0
+    # Handle AJAX request correctly
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({
+            "total_schools": total_schools,
+            "total_teachers": total_teachers,
+            "total_students_assessed": total_students_assessed,
+            "total_district_average": round(total_district_average, 2),
+            "best_performing_schools": best_performing_schools,
+            "weakest_performing_schools": weakest_performing_schools,
+            "best_performing_subjects": best_performing_subjects,
+            "weakest_performing_subjects": weakest_performing_subjects,
+            "performance_trends": trend_data,
+            "notifications": formatted_notifications,
+        })
 
-    district_summary = {
-        'submitted': successful_submissions,
-        'pending': pending_submissions,
-        'not_submitted': not_submitted,
-    }
+    # Pass selected filters back to the template
+    return render(request, "dashboards/cis_dashboard.html", {
+        "academic_years": available_years,
+        "terms": available_terms,
+        "selected_year": selected_year,
+        "selected_term": selected_term,
+        "total_schools": total_schools,
+        "total_teachers": total_teachers,
+        "total_students_assessed": total_students_assessed,
+        "total_district_average": round(total_district_average, 2),
+        "best_performing_schools": best_performing_schools,
+        "weakest_performing_schools": weakest_performing_schools,
+        "best_performing_subjects": best_performing_subjects,
+        "weakest_performing_subjects": weakest_performing_subjects,
+        "performance_trends": trend_data,
+        "notifications": formatted_notifications,
+    })
 
-    pie_chart_data = {
-        'labels': ['Submitted', 'Pending Approval', 'Not Submitted'],
-        'data': [successful_submissions, pending_submissions, not_submitted],
-        'colors': ['#28a745', '#fd7e14', '#dc3545'],
-    }
-
-    context = {
-        'user': request.user,
-        'district_name': district_name,
-        'total_schools': total_schools,
-        'total_teachers': total_teachers,
-        'avg_district_performance': district_performance['average_grade'] or 'N/A',
-        'performance_data': performance_data,
-        'top_schools': [
-            {
-                'name': school.name,
-                'performance_score': f"{school.performance_score:.2f}%" if school.performance_score else "N/A"
-            } for school in top_schools
-        ],
-        'district_summary': district_summary,
-        'pie_chart_data': pie_chart_data,
-    }
-    return render(request, 'dashboards/cis_dashboard.html', context)
 
 
 #------------ SISO DASHBOARD -----------------------

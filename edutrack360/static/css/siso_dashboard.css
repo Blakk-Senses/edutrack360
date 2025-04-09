@@ -140,12 +140,12 @@ body {
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
     .sidebar {
-        width: 70px; /* Smaller sidebar for mobile */
+        width: 30px; /* Smaller sidebar for mobile */
     }
 
     .main-content {
-        margin-left: 90px;
-        margin-top: 70px;
+        margin-left: 30px;
+        margin-top: 50px;
     }
 }
 

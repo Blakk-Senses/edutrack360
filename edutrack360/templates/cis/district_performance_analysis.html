@@ -1,0 +1,288 @@
+{% load custom_filters %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>District Performance Analysis</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        .table-container {
+            max-height: 500px;
+            overflow-x: auto;
+            overflow-y: auto;
+        }
+        thead th {
+            position: sticky;
+            top: 0;
+            background: #fff;
+            z-index: 10;
+        }
+        body {
+            font-family: 'Calibri', sans-serif;
+            margin: 0;
+            background-color: #e0f7fa;
+            padding-top: 80px;
+        }
+        .navbar {
+            background-color: #003a3b;
+            color: white;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            padding: 10px 20px;
+        }
+        .logo-img {
+            max-width: 120px;
+            height: auto;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .text-center {
+            color: rgb(1, 107, 107);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid d-flex justify-content-between">
+            <a href="{% url 'dashboards:cis_dashboard' %}">
+                <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
+            </a>
+        </div>
+    </nav>
+    <div class="container py-5">
+        <!-- 🔍 Filters -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h3 class="card-title mb-4 text-secondary">District Circuit Performance</h3>
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Academic Year</label>
+                        <select name="academic_year" class="form-select">
+                            {% for year in filters.academic_years %}
+                                <option value="{{ year }}" {% if year == filters.selected_year %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Term</label>
+                        <select name="term" class="form-select">
+                            {% for term in filters.terms %}
+                                <option value="{{ term }}" {% if term == filters.selected_term %}selected{% endif %}>{{ term }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Circuit</label>
+                        <select name="circuit_id" class="form-select">
+                            <option value="all" {% if filters.selected_circuit == "all" %}selected{% endif %}>All</option>
+                            {% for c in filters.available_circuits %}
+                                <option value="{{ c.id }}" {% if c.id|stringformat:"s" == filters.selected_circuit %}selected{% endif %}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-outline-primary w-100">
+                            <i class="bi bi-filter"></i> Filter
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    
+        {% for circuit in circuits %}
+        <!-- 📍 Circuit Block -->
+        <div class="mb-5">
+            <h3 class="mb-3 text-secondary"> {{ circuit.name }} Circuit</h3>
+            <div>
+                {% for school, school_data in circuit.school_departments.items %}
+                <div class="card shadow-sm border-0 mb-5">
+                    <div class="card-body">
+                        <h5 class="card-title text-black">{{ school }}</h5>
+        
+                        {% for dept, dept_data in school_data.items %}
+                        <div class="card shadow-sm border-0 mb-5">
+                            <div class="card-body">
+                                <h5 class="card-title text-secondary">{{ dept }}</h5>
+        
+                                <table class="table table-bordered table-hover text-center mt-4">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Subject</th>
+                                            {% for class_name in dept_data.all_classes %}
+                                                <th>{{ class_name }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for subject, class_data in dept_data.subjects.items %}
+                                            <tr>
+                                                <td class="fw-semibold text-start">{{ subject }}</td>
+                                                {% for class_name in dept_data.all_classes %}
+                                                    <td>{{ class_data|get_item:class_name|default:"-" }}</td>
+                                                {% endfor %}
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+        
+                                <!-- 📊 Bar Chart -->
+                                {% with slug=dept|slugify|stringformat:"s"|add:"_"|add:school|slugify %}
+                                    <canvas id="barChart_{{ slug }}" height="120"></canvas>
+                                    {{ dept_data.subjects|json_script:"bar-data-"|add:slug }}
+                                    {{ dept_data.all_classes|json_script:"bar-classes-"|add:slug }}
+                                {% endwith %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+        
+                <!-- 📈 Trends -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title text-secondary">Term Performance Trend</h5>
+                        <table class="table table-bordered table-hover text-center mt-3">
+                            <thead class="table-light">
+                                <tr>
+                                    {% for key in circuit.term_trend.keys %}
+                                        <th>{{ key }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    {% for val in circuit.term_trend.values %}
+                                        <td>{{ val }}</td>
+                                    {% endfor %}
+                                </tr>
+                            </tbody>
+                        </table>
+                        <canvas id="termLineChart_{{ forloop.counter }}" height="100"></canvas>
+                        {{ circuit.term_chart|json_script:"term-chart-data-"|add:forloop.counter|stringformat:"s" }}
+                    </div>
+                </div>
+        
+                <div class="card shadow-sm border-0 mb-5">
+                    <div class="card-body">
+                        <h5 class="card-title text-secondary">Academic Year Trend</h5>
+                        <table class="table table-bordered table-hover text-center mt-3">
+                            <thead class="table-light">
+                                <tr>
+                                    {% for key in circuit.academic_trend.keys %}
+                                        <th>{{ key }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    {% for val in circuit.academic_trend.values %}
+                                        <td>{{ val }}</td>
+                                    {% endfor %}
+                                </tr>
+                            </tbody>
+                        </table>
+                        <canvas id="yearLineChart_{{ forloop.counter }}" height="100"></canvas>
+                        {{ circuit.year_chart|json_script:"year-chart-data-"|add:forloop.counter|stringformat:"s" }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    
+        <!-- 📥 Download -->
+        <div class="shadow-sm border rounded px-4 py-3 mt-4">
+            <a href="{% url 'siso:download_circuit_performance_pdf' %}?academic_year={{ filters.selected_year }}&term={{ filters.selected_term }}&circuit_id={{ filters.selected_circuit }}"
+                class="btn btn-outline-primary w-100">
+                ⬇️ Download PDF Report
+            </a>
+        </div>
+    </div>
+    
+    <!-- 📊 Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            // ➕ Line Charts for term/year trends
+            document.querySelectorAll("script[id^='term-chart-data-']").forEach(script => {
+                const suffix = script.id.split("term-chart-data-")[1];
+                const termData = JSON.parse(script.textContent);
+                const ctx = document.getElementById(`termLineChart_${suffix}`)?.getContext("2d");
+                if (ctx) {
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: termData.labels,
+                            datasets: [{
+                                label: 'Average',
+                                data: termData.data,
+                                borderColor: '#0d6efd',
+                                backgroundColor: 'rgba(13,110,253,0.2)',
+                                fill: true,
+                                tension: 0.3
+                            }]
+                        },
+                        options: {
+                            plugins: { legend: { display: false } },
+                            scales: { y: { beginAtZero: true } }
+                        }
+                    });
+                }
+            });
+    
+            // 🎯 Clustered Bar Charts per Department
+            document.querySelectorAll("script[id^='bar-data-']").forEach(script => {
+                const deptKey = script.id.replace("bar-data-", "");
+                const barData = JSON.parse(script.textContent);  // Get the data for the subjects
+                const barLabels = JSON.parse(document.getElementById(`bar-classes-${deptKey}`).textContent);  // Get the classes
+    
+                const subjects = Object.keys(barData);  // Subject names, e.g., Mathematics
+                const datasets = barLabels.map((cls, i) => ({
+                    label: cls,  // Label for the class
+                    data: subjects.map(sub => barData[sub][cls] || 0),  // Get the data for each class per subject
+                    backgroundColor: `hsl(${(i * 50) % 360}, 70%, 60%)`,  // Use different colors for each class
+                    borderColor: `hsl(${(i * 50) % 360}, 70%, 40%)`,  // Border color
+                    borderWidth: 1
+                }));
+    
+                const ctx = document.getElementById(`barChart_${deptKey}`)?.getContext("2d");
+    
+                if (ctx) {
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: subjects,  // Subjects are on the x-axis
+                            datasets: datasets  // Multiple datasets for each class
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                tooltip: { mode: 'index', intersect: false },
+                                title: { display: true, text: 'Class-wise Subject Performance' }
+                            },
+                            scales: {
+                                x: { stacked: false },  // Clustered bars, not stacked
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { precision: 0 }
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+    
+    
+</body>
+</html>    
+    

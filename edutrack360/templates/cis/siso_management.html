@@ -5,33 +5,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SISO Management</title>
-    
-    <!-- Font Awesome for Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         body {
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Calibri', sans-serif;
             margin: 0;
-            background-color: #e0f7fa; /* Light teal */
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden; /* Prevent scrolling on body */
+            background-color: #e0f7fa;
+            padding-top: 50px; /* Ensures content doesn't overlap with navbar */
         }
 
         .navbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 20px;
-            background-color: #003a3b; /* Dark background */
+            background-color: #003a3b;
             color: white;
             position: fixed;
             width: 100%;
             top: 0;
-            height: 60px;
-            z-index: 1000; /* Ensure navbar is on top */
+            z-index: 1000;
+            padding: 10px 20px;
         }
 
         .logo-img {
@@ -39,415 +31,295 @@
             height: auto;
         }
 
-        .navbar-icons {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .navbar-icons i {
-            font-size: 22px;
-            display: inline-block;
-            color: white; /* Ensure visibility */
-        }
-
-        .sidebar {
-            width: 100px;
-            background-color: #004d40;
-            position: fixed;
-            top: 60px;
-            left: 0;
-            height: calc(100vh - 60px);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding-top: 20px;
-            color: white;
-            z-index: 900;
-            gap: 30px;
-        }
-
-        .sidebar a {
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            color: white;
-            text-decoration: none;
-            transition: background-color 0.3s;
-            width: 100%;
-            position: relative;
-        }
-
-        .sidebar a i {
-            font-size: 1.5rem;
-        }
-
-        .sidebar a:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-
-        .tooltip {
-            font-size: 12px;
-            margin-top: 5px;
-            display: block; /* Ensure tooltips are visible */
-        }
-
-        .main {
-            margin-left: 100px; /* Account for sidebar */
-            margin-top: 60px; /* Account for navbar */
+        .container {
+            margin-left: 100px;
+            margin-top: 60px;
             padding: 20px;
-            height: calc(100vh - 60px);
-            overflow: auto; /* Make content area scrollable */
         }
 
-        .form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            width: 100%;
-            max-width: 600px;
-            margin: auto; /* Center form */
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .form label {
-            font-weight: bold;
-        }
-
-        .form input, .form select {
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            width: 100%;
-        }
-
-        .form button {
-            background-color: #008080;
-            color: #fff;
-            border: none;
-            padding: 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            width: 100%;
-            font-weight: bold;
-        }
-
-        .form button:hover {
-            background-color: #005959;
-        }
-
-        .error {
-            color: red;
-            font-size: 0.9em;
-        }
-
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 80px;
-            }
-
-            .main {
-                margin-left: 80px;
-            }
-
-            .sidebar a i {
-                font-size: 1.3rem;
-            }
-        }
-        /* Active state styling */
-        .sidebar a.active {
-            background-color: #e0f7fa; /* Match main content background */
-            color: #004d40; /* Dark teal for contrast */
-        }
-
-        /* Ensure active icon color matches sidebar color */
-        .sidebar a.active i {
-            color: #004d40 !important; /* Match sidebar color */
-        }
-        /* Hover effect */
-        .sidebar a:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-        .sidebar a .tooltip {
-            visibility: hidden;
-            background-color: #004d40; /* Dark background */
-            color: #ffffff; /* White text */
-            text-align: center;
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-size: 14px;
-            font-weight: 500;
-            white-space: nowrap;
-            position: absolute;
-            left: 80%; /* Place it slightly outside the sidebar */
-            top: 50%;
-            transform: translateY(-50%);
-            opacity: 0;
-            transition: opacity 0.3s ease-in-out, transform 0.2s ease-in-out;
-            z-index: 9999; /* Ensure it appears above everything */
-            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Tooltip Arrow (Pointer) */
-        .sidebar a .tooltip::before {
-            content: "";
-            position: absolute;
-            top: 50%;
-            left: -10px; /* Place arrow at the left */
-            transform: translateY(-50%);
-            border-width: 6px;
-            border-style: solid;
-            border-color: transparent #004d40 transparent transparent; /* Arrow effect */
-        }
-
-        /* Show Tooltip on Hover */
-        .sidebar a:hover .tooltip {
-            visibility: visible;
-            opacity: 1;
-            transform: translateY(-50%) translateX(5px);
+        .nav-pills .nav-link.active {
+            color: white !important;
         }
     </style>
 </head>
 <body>
+
     <div class="navbar">
         <div class="logo">
-          <a href="{% url 'dashboards:cis_dashboard' %}">
-            <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
-          </a>
+            <a href="{% url 'dashboards:cis_dashboard' %}" class="href">
+                <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
+            </a>
         </div>
     </div>
-    <div class="sidebar">
-        <a href="#" data-form="create_circuit">
-            <i class="fa-solid fa-plus-circle"></i>
-            <span class="tooltip">Create Circuit</span>
-        </a>
-        <a href="#" data-form="assign_siso">
-            <i class="fa-solid fa-user-plus"></i>
-            <span class="tooltip">Assign SISO</span>
-        </a>
-        <a href="#" data-form="reassign_siso">
-            <i class="fa-solid fa-exchange-alt"></i>
-            <span class="tooltip">Reassign SISO</span>
-        </a>
-        <a href="#" data-form="delete_siso">
-            <i class="fa-solid fa-trash-alt"></i>
-            <span class="tooltip">Delete SISO</span>
-        </a>
-    </div>
-    <div class="main">
-        {% if messages %}
-            <div class="messages">
-                {% for message in messages %}
-                    <div class="{% if message.tags %}{{ message.tags }}{% endif %}">
-                        {{ message }}
+
+    <main class="container mt-4">
+
+        <ul class="nav nav-pills justify-content-center mb-4" id="circuitTabs">
+            <li class="nav-item">
+                <a class="nav-link fw-bold text-success" id="createCircuit-tab" data-bs-toggle="pill" href="#createCircuit" role="tab">
+                    <i class="fas fa-plus-circle me-1"></i> Create Circuit
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active fw-bold" id="assignSiso-tab" data-bs-toggle="pill" href="#assignSiso" role="tab">
+                    <i class="fas fa-user-check me-1"></i> Assign SISO
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link fw-bold text-warning" id="reassignSiso-tab" data-bs-toggle="pill" href="#reassignSiso" role="tab">
+                    <i class="fas fa-exchange-alt me-1"></i> Reassign SISO
+                </a>
+            </li>
+        </ul>
+    
+        <!-- Tabs Content -->
+        <div class="tab-content">
+
+            <!-- Create Circuit Tab -->
+            <div class="tab-pane fade p-4 shadow rounded bg-white" id="createCircuit" role="tabpanel">
+                <h4 class="text-success"><i class="fas fa-plus-circle me-2"></i> Create a New Circuit</h4>
+                <form id="createCircuitForm">
+                    <div class="mb-3">
+                        <label for="circuit-name" class="fw-semibold">Circuit Name:</label>
+                        <input type="text" class="form-control border-success" id="circuit-name" placeholder="Enter circuit name" required>
                     </div>
-                {% endfor %}
+                    <div class="mb-3">
+                        <label for="siso-create" class="fw-semibold">Assign SISO (Optional):</label>
+                        <select class="form-control border-success" id="siso-create">
+                            <option value="">Select SISO</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="fas fa-plus me-1"></i> Create Circuit
+                    </button>
+                </form>
             </div>
-        {% endif %}
-        <h2 style="text-align: center;">SISO Management</h2>
-        <div id="form-content"></div> <!-- Placeholder for dynamic content -->
-    </div>
 
+            <!-- Assign SISO to Circuit Tab -->
+            <div class="tab-pane fade show active p-4 shadow rounded bg-white" id="assignSiso" role="tabpanel">
+                <h4 class="text-primary"><i class="fas fa-user-check me-2"></i> Assign a SISO</h4>
+                <form id="assignSisoForm">
+                    <div class="mb-3">
+                        <label for="circuit" class="fw-semibold">Select Circuit:</label>
+                        <select class="form-control border-primary" id="circuit" required>
+                            <option value="">Select Circuit</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="siso-assign" class="fw-semibold">Select SISO:</label>
+                        <select class="form-control border-primary" id="siso-assign" required>
+                            <option value="">Select SISO</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-paper-plane me-1"></i> Assign SISO
+                    </button>
+                </form>
+            </div>
+
+            <!-- Reassign SISO to New Circuit Tab -->
+            <div class="tab-pane fade p-4 shadow rounded bg-white" id="reassignSiso" role="tabpanel">
+                <h4 class="text-warning"><i class="fas fa-exchange-alt me-2"></i> Reassign SISO</h4>
+                <form id="reassignSisoForm">
+                    <div class="mb-3">
+                        <label for="siso-reassign" class="fw-semibold">Select SISO:</label>
+                        <select class="form-control border-warning" id="siso-reassign" required>
+                            <option value="">Select SISO</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="previous-circuit" class="fw-semibold">Previous Circuit:</label>
+                        <select class="form-control border-warning" id="previous-circuit" disabled>
+                            <option value="">Previous Circuit</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new-circuit" class="fw-semibold">Select New Circuit:</label>
+                        <select class="form-control border-secondarywarning
+                            <option value="">Select New Circuit</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-warning w-100">
+                        <i class="fas fa-exchange-alt me-1"></i> Reassign SISO
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal -->
+        <div class="modal fade" id="confirmationModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Action Result</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body"></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bootstrap & JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            console.log("DOM fully loaded!");
+            loadCircuits();
+            loadSisos();
 
-            const formContent = document.getElementById("form-content");
-            const sidebarLinks = document.querySelectorAll(".sidebar a");
+            document.getElementById("createCircuitForm").addEventListener("submit", function (event) {
+                event.preventDefault();
+                createCircuit();
+            });
 
-            if (!formContent) {
-                console.error("Error: Form content container not found.");
+            document.getElementById("assignSisoForm").addEventListener("submit", function (event) {
+                event.preventDefault();
+                assignSiso();
+            });
+
+            document.getElementById("reassignSisoForm").addEventListener("submit", function (event) {
+                event.preventDefault();
+                reassignSiso();
+            });
+
+            document.getElementById("siso-reassign").addEventListener("change", function () {
+                loadPreviousCircuitForSiso(this.value);
+            });
+        });
+
+        function loadSisos() {
+            fetch("/cis/sisos/")
+                .then(response => response.json())
+                .then(data => {
+                    let sisoDropdowns = [
+                        document.getElementById("siso-create"),
+                        document.getElementById("siso-assign"),
+                        document.getElementById("siso-reassign")
+                    ];
+                    sisoDropdowns.forEach(select => {
+                        select.innerHTML = '<option value="">Select SISO</option>';
+                        data.sisos.forEach(siso => {
+                            let fullName = `${siso.first_name} ${siso.last_name}`;
+                            select.innerHTML += `<option value="${siso.id}">${fullName}</option>`;
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error("Error loading sisos:", error);
+                    alert("Failed to load SISOs. Check console for details.");
+                });
+        }
+
+        function loadCircuits() {
+            fetch("/cis/circuits/")
+                .then(response => response.json())
+                .then(data => {
+                    let circuitSelects = [
+                        document.getElementById("circuit"),
+                        document.getElementById("new-circuit"),
+                        document.getElementById("previous-circuit")
+                    ];
+                    circuitSelects.forEach(select => {
+                        select.innerHTML = '<option value="">Select Circuit</option>';
+                        data.forEach(circuit => {
+                            select.innerHTML += `<option value="${circuit.id}">${circuit.name}</option>`;
+                        });
+                    });
+                })
+                .catch(error => console.error("Error loading circuits:", error));
+        }
+
+        function loadPreviousCircuitForSiso(sisoId) {
+            const previousCircuitSelect = document.getElementById("previous-circuit");
+            previousCircuitSelect.innerHTML = '<option value="">Select Previous Circuit</option>'; // Always include this option
+
+            if (!sisoId) {
+                previousCircuitSelect.disabled = true;
                 return;
             }
 
-            if (sidebarLinks.length === 0) {
-                console.error("Error: No sidebar links found.");
-                return;
-            }
+            fetch(`/cis/siso/current-circuit/${sisoId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    const option = document.createElement("option");
+                    option.value = data.id || "";
+                    option.textContent = data.name || "No circuit assigned";
+                    option.selected = true;
 
-            const formUrls = {
-                "create_circuit": "{% url 'cis:create_circuit' %}",
-                "assign_siso": "{% url 'cis:assign_siso' %}",
-                "reassign_siso": "{% url 'cis:reassign_siso' %}",
-                "delete_siso": "{% url 'cis:delete_siso' %}",
-            };
-
-            function updateActiveLink(clickedLink) {
-                sidebarLinks.forEach(link => link.classList.remove("active"));
-                clickedLink.classList.add("active");
-            }
-
-            function loadForm(formKey, clickedLink) {
-                let url = formUrls[formKey];
-                if (!url) {
-                    console.error(`Invalid form key: ${formKey}`);
-                    return;
-                }
-
-                fetch(url)
-                    .then(response => {
-                        if (!response.ok) throw new Error("Error loading form");
-                        return response.text();
-                    })
-                    .then(data => {
-                        formContent.innerHTML = data;
-                        updateActiveLink(clickedLink);
-                    })
-                    .catch(error => console.error("Error loading form:", error));
-            }
-
-            // Set "Create Circuit" as default active and load its form
-            const defaultLink = document.querySelector('[data-form="create_circuit"]');
-            if (defaultLink) {
-                console.log("Setting Create Circuit as default active link.");
-                defaultLink.classList.add("active");
-                loadForm("create_circuit", defaultLink);
-            } else {
-                console.warn("Warning: Default link (Create Circuit) not found.");
-            }
-
-            // Attach event listeners to sidebar links
-            sidebarLinks.forEach(link => {
-                link.addEventListener("click", function (event) {
-                    event.preventDefault(); // Prevent default anchor behavior
-                    const formKey = this.getAttribute("data-form");
-                    if (formKey) {
-                        loadForm(formKey, this);
-                    }
+                    previousCircuitSelect.appendChild(option);
+                    previousCircuitSelect.disabled = true;
+                })
+                .catch(error => {
+                    console.error("Error fetching current circuit:", error);
+                    alert("Failed to load previous circuit. Please try again.");
                 });
-            });
-
-            console.log("Event listeners successfully attached!");
-        });
+        }
 
 
+        function createCircuit() {
+            const name = document.getElementById("circuit-name").value;
+            const sisoId = document.getElementById("siso-create").value;
+            fetch("/cis/circuit/create/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": getCSRFToken()
+                },
+                body: `name=${encodeURIComponent(name)}&siso_id=${encodeURIComponent(sisoId)}`
+            })
+            .then(response => response.json())
+            .then(data => showModal(data.message || data.error))
+            .catch(error => console.error("Error creating circuit:", error));
+        }
+
+        function assignSiso() {
+            const circuitId = document.getElementById("circuit").value;
+            const sisoId = document.getElementById("siso-assign").value;
+            fetch("/cis/siso/assign/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": getCSRFToken()
+                },
+                body: `circuit_id=${encodeURIComponent(circuitId)}&siso_id=${encodeURIComponent(sisoId)}`
+            })
+            .then(response => response.json())
+            .then(data => showModal(data.message || data.error))
+            .catch(error => console.error("Error assigning SISO:", error));
+        }
+
+        function reassignSiso() {
+            const sisoId = document.getElementById("siso-reassign").value;
+            const newCircuitId = document.getElementById("new-circuit").value;
+            fetch("/cis/siso/reassign/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": getCSRFToken()
+                },
+                body: `siso=${encodeURIComponent(sisoId)}&new_circuit=${encodeURIComponent(newCircuitId)}`
+            })
+            .then(response => response.json())
+            .then(data => showModal(data.message || data.error))
+            .catch(error => console.error("Error reassigning SISO:", error));
+        }
+
+
+        function showModal(message) {
+            document.querySelector("#confirmationModal .modal-body").innerHTML = message;
+            new bootstrap.Modal(document.getElementById("confirmationModal")).show();
+        }
+
+        function getCSRFToken() {
+            return document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrftoken='))
+                ?.split('=')[1];
+        }
     </script>
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const formContent = document.getElementById("form-content");
-            const buttons = document.querySelectorAll(".nav-buttons button");
-    
-            const formUrls = {
-                "create_circuit": "{% url 'cis:create_circuit' %}",
-                "assign_siso": "{% url 'cis:assign_siso' %}",
-                "reassign_siso": "{% url 'cis:reassign_siso' %}",
-                "delete_siso": "{% url 'cis:delete_siso' %}",
-            };
-    
-            function updateActiveButton(clickedBtn) {
-                buttons.forEach(btn => btn.classList.remove("active"));
-                clickedBtn.classList.add("active");
-            }
-    
-            function loadForm(formKey, clickedBtn) {
-                let url = formUrls[formKey];
-                if (!url) {
-                    console.error(`Invalid form key: ${formKey}`);
-                    return;
-                }
-    
-                fetch(url)
-                    .then(response => {
-                        if (!response.ok) throw new Error("Error loading form");
-                        return response.text();
-                    })
-                    .then(data => {
-                        formContent.innerHTML = data;
-                        updateActiveButton(clickedBtn);
-    
-                        // Check which form is loaded and fetch the relevant data
-                        if (formKey === "reassign_siso") {
-                            fetchCircuits("new-circuit"); // Fetch circuits for the Reassign SISO form
-                            fetchSiso("existing-siso"); // Fetch SISOs for the Reassign SISO form
-                        } else if (formKey === "assign_siso") {
-                            fetchCircuits("existing-circuit"); // Fetch circuits for the Assign SISO form
-                        } else if (formKey === "create_circuit") {
-                            fetchSiso("existing-siso"); // Fetch SISOs for the Create Circuit form if needed
-                        } else if (formKey === "delete_siso") {
-                            fetchSiso("existing-siso"); // Fetch SISOs for the Delete SISO form
-                        }
-                    })
-                    .catch(error => console.error("Error loading form:", error));
-            }
-    
-            function fetchSiso(selectId) {
-                const sisoSelect = document.getElementById(selectId);
-                if (!sisoSelect) {
-                    console.error("SISO select element not found.");
-                    return;
-                }
-    
-                fetch("{% url 'cis:get_siso' %}")
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error("Network response was not ok");
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log("Fetched SISOs Data:", data);
-                        sisoSelect.innerHTML = '<option value="">Select SISO</option>';
-                        if (data.sisos) {
-                            data.sisos.forEach(siso => {
-                                let option = new Option(`${siso.first_name} ${siso.last_name}`, siso.id);
-                                sisoSelect.add(option);
-                            });
-                        } else {
-                            console.error("No SISOs found in response.");
-                        }
-                    })
-                    .catch(error => console.error("Error fetching SISOs:", error));
-            }
-    
-            function fetchCircuits(selectId) {
-                const circuitSelect = document.getElementById(selectId);
-                if (!circuitSelect) {
-                    console.error("Circuit select element not found.");
-                    return;
-                }
 
-                fetch("{% url 'cis:get_circuits' %}")
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error("Network response was not ok");
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log("Fetched Circuits Data:", data);
-                        circuitSelect.innerHTML = '<option value="">Select Circuit</option>';
-                        if (data.circuits) {
-                            data.circuits.forEach(circuit => {
-                                let option = new Option(circuit.name, circuit.id);
-                                circuitSelect.add(option);
-                            });
-                        } else {
-                            console.error("No circuits found in response.");
-                        }
-                    })
-                    .catch(error => console.error("Error fetching circuits:", error));
-            }
-    
-            const defaultButton = document.querySelector('[data-form="create_circuit"]');
-            if (defaultButton) {
-                defaultButton.classList.add("active");
-                loadForm("create_circuit", defaultButton);
-            }
-    
-            buttons.forEach(btn => {
-                btn.addEventListener("click", function () {
-                    const formKey = this.getAttribute("data-form");
-                    if (formKey) {
-                        loadForm(formKey, this);
-                    }
-                });
-            });
-        });
-    </script>
 </body>
 </html>

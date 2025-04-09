@@ -199,11 +199,12 @@ def get_circuit_performance_context(request):
 
     # Query for selected marks
     selected_marks = StudentMark.objects.filter(
-        academic_year=academic_year,
-        term=selected_term,
-        student__school__in=schools_in_circuit,
-        subject__results__status="Submitted"
-    ).select_related("subject", "student__class_group", "student")
+        student__school__in=schools_in_circuit,  # Filter by schools in the circuit
+        academic_year=academic_year,  # Filter by academic year
+        term=selected_term,  # Filter by term
+        subject__results__status="Submitted"  # Only include submitted results
+    ).distinct()
+    
 
     print("🧾 Total submitted marks fetched:", selected_marks.count())
 

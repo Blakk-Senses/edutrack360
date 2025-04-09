@@ -73,7 +73,9 @@
 
     <!-- Main Content -->
     <div class="flex-grow-1 d-flex flex-column align-items-center justify-content-center text-center px-4 main-content">
-        <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo">
+        <a href="{% url 'homepage' %}">
+            <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo">
+        </a>
         <h1 class="display-4 fw-bold text-white mt-5">Welcome!</h1>
         <p class="text-white-50 fs-5 mt-2">A comprehensive Tool for Tacking Academic Performance and Progress</p>
         <a href="{% url 'login' %}" class="modern-btn">Login</a>

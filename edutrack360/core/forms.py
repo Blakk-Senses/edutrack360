@@ -2,10 +2,10 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from datetime import datetime
+from django.core.exceptions import ValidationError
 from core.models import (
-    Circuit, School, Student, 
-    Subject, ClassGroup, Department, Result, Teacher, User,
-    Notification,
+    Circuit, School, Subject, ClassGroup, Result, Teacher, 
+    Notification, School, Circuit
 
 )
 from django.contrib.auth.forms import UserCreationForm
@@ -20,16 +20,11 @@ class SubjectForm(forms.ModelForm):
 
 
 class AddSchoolForm(forms.ModelForm):
-    # Headteacher details
-    headteacher_staff_id = forms.CharField(max_length=50, label="Headteacher Staff ID")
-    headteacher_first_name = forms.CharField(max_length=50, label="Headteacher First Name")
-    headteacher_last_name = forms.CharField(max_length=50, label="Headteacher Last Name")
-    headteacher_license_number = forms.CharField(max_length=50, label="Headteacher License Number")
-    headteacher_email = forms.EmailField(label="Headteacher Email")
-    headteacher_phone_number = forms.CharField(max_length=50, label="Headteacher Phone Number")
-    headteacher_password = forms.CharField(widget=forms.PasswordInput(), label="Headteacher Password")
-
-    circuit = forms.ModelChoiceField(queryset=Circuit.objects.none(), label="Circuit", required=True)
+    circuit = forms.ModelChoiceField(
+        queryset=Circuit.objects.none(), 
+        label="Circuit", 
+        required=True
+    )
 
     class Meta:
         model = School
@@ -38,129 +33,30 @@ class AddSchoolForm(forms.ModelForm):
     def __init__(self, *args, request=None, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Ensure request is available to filter circuits
-        if request and hasattr(request.user, 'assigned_district'):
-            self.fields['circuit'].queryset = Circuit.objects.filter(district=request.user.assigned_district)
+        # Limit circuits to those within the user's assigned district
+        if request and hasattr(request.user, 'district'):
+            self.fields['circuit'].queryset = Circuit.objects.filter(
+                district=request.user.district
+            )
+            self.request = request  # Optional: useful if needed later
 
     def clean(self):
         cleaned_data = super().clean()
 
-        # Ensure email uniqueness for headteacher
-        email = cleaned_data.get('headteacher_email')
-        if email and User.objects.filter(email=email).exists():
-            raise forms.ValidationError("A user with this email already exists.")
+        # Optional extra safety check (if someone tries to tamper with circuit input)
+        circuit = cleaned_data.get('circuit')
+        if circuit and hasattr(self.request.user, 'district'):
+            if circuit.district != self.request.user.assigned_district:
+                raise ValidationError("Selected circuit does not belong to your district.")
 
-        # Ensure school code uniqueness
+        # Check for duplicate school code
         school_code = cleaned_data.get('school_code')
         if school_code and School.objects.filter(school_code=school_code).exists():
-            raise forms.ValidationError("A school with this code already exists.")
+            raise ValidationError("A school with this code already exists.")
 
         return cleaned_data
 
-    def save_headteacher(self, school_instance):
-        cleaned_data = self.cleaned_data
-        
-        # Create the headteacher user and assign the school and district
-        headteacher = User.objects.create(
-            staff_id=cleaned_data['headteacher_staff_id'],
-            first_name=cleaned_data['headteacher_first_name'],
-            last_name=cleaned_data['headteacher_last_name'],
-            license_number=cleaned_data['headteacher_license_number'],
-            email=cleaned_data['headteacher_email'],
-            phone_number=cleaned_data['headteacher_phone_number'],
-            role='headteacher',
-            district=school_instance.district,  # Assign the district from the school
-            school=school_instance,  # Assign the school itself
-            password=make_password(cleaned_data['headteacher_password'])
-        )
-        return headteacher
 
-class BulkUploadForm(forms.Form):
-    csv_file = forms.FileField(label="Upload CSV File")
-
-
-class CreateCircuitForm(forms.ModelForm):
-    siso = forms.ModelChoiceField(queryset=User.objects.none(), required=False, label="SISO")
-
-    class Meta:
-        model = Circuit
-        fields = ['name']
-
-    def __init__(self, *args, **kwargs):
-        district = kwargs.pop('district', None)
-        super().__init__(*args, **kwargs)
-        if district:
-            self.fields['siso'].queryset = User.objects.filter(district=district, role='siso')
-
-
-class AssignSISOForm(forms.ModelForm):
-    staff_id = forms.CharField(max_length=50, label="Staff ID")
-    license_number = forms.CharField(max_length=50, label="License Number")
-    first_name = forms.CharField(max_length=50, label="First Name")
-    last_name = forms.CharField(max_length=50, label="Last Name")
-    email = forms.EmailField(label="Email Address")
-    phone_number = forms.CharField(max_length=15, required=False, label="Phone Number")
-    password = forms.CharField(widget=forms.PasswordInput(), label="Password")
-    circuit = forms.ModelChoiceField(queryset=Circuit.objects.none(), label="Assign to Circuit")
-
-    class Meta:
-        model = User
-        fields = [
-            'staff_id', 'license_number', 'first_name', 'last_name', 'email', 
-            'phone_number', 'password', 'circuit', 'role'
-        ]
-
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)  # Get the logged-in user
-        super().__init__(*args, **kwargs)
-
-        if user and user.assigned_district:
-            self.fields['circuit'].queryset = Circuit.objects.filter(district=user.assigned_district)
-
-        print("Available circuits:", list(self.fields['circuit'].queryset.values_list("id", "name")))
-
-    def clean_circuit(self):
-        circuit = self.cleaned_data.get("circuit")
-        if circuit not in self.fields["circuit"].queryset:
-            raise forms.ValidationError("Selected circuit is not available for this district.")
-        return circuit
-
-    def save(self, user, commit=True):
-        siso_user = super().save(commit=False)
-        siso_user.role = 'siso'
-        siso_user.district = user.assigned_district
-        siso_user.set_password(self.cleaned_data['password'])
-
-        if commit:
-            siso_user.save()
-            # Assign the circuit's siso field
-            circuit = self.cleaned_data.get("circuit")
-            if circuit:
-                circuit.siso = siso_user
-                circuit.save()
-        
-        return siso_user
-
-
-class ReassignSISOForm(forms.Form):
-    siso = forms.ModelChoiceField(queryset=User.objects.none(), label="Select SISO")
-    circuit = forms.ModelChoiceField(queryset=Circuit.objects.none(), label="Select New Circuit")
-
-    def __init__(self, *args, **kwargs):
-        district = kwargs.pop('district', None)
-        super().__init__(*args, **kwargs)
-        if district:
-            self.fields['siso'].queryset = User.objects.filter(district=district, role='siso')
-            self.fields['circuit'].queryset = Circuit.objects.filter(district=district)
-
-class DeleteSISOForm(forms.Form):
-    siso = forms.ModelChoiceField(queryset=User.objects.none(), label="Select SISO to Delete")
-
-    def __init__(self, *args, **kwargs):
-        district = kwargs.pop('district', None)
-        super().__init__(*args, **kwargs)
-        if district:
-            self.fields['siso'].queryset = User.objects.filter(district=district, role='siso')
 
 
 class ResultUploadForm(forms.Form):
@@ -227,6 +123,94 @@ class TeacherRegistrationForm(UserCreationForm):
         return user
 
 
+class UserRegistrationForm(UserCreationForm):
+    staff_id = forms.IntegerField()
+    license_number = forms.CharField(max_length=50)
+    first_name = forms.CharField(max_length=50)
+    last_name = forms.CharField(max_length=50)
+    email = forms.EmailField()
+    phone_number = forms.CharField(
+        max_length=15,
+        validators=[RegexValidator(r'^\+?1?\d{9,15}$', 'Enter a valid phone number.')],
+    )
+    role = forms.ChoiceField(choices=User.ROLE_CHOICES)
+
+    class Meta:
+        model = User
+        fields = [
+            "staff_id", "license_number", "first_name", "last_name",
+            "email", "phone_number", "password1", "password2", "role"
+        ]
+
+    def __init__(self, *args, **kwargs):
+        self.district = kwargs.pop("district", None)  # Passed from view based on logged-in user
+        self.school = kwargs.pop("school", None)
+        self.circuit = kwargs.pop("circuit", None)
+        super().__init__(*args, **kwargs)
+
+        # Dynamically adjust the circuit and school fields based on district or other context
+        if self.district:
+            self.fields['circuit'] = forms.ModelChoiceField(
+                queryset=Circuit.objects.filter(district=self.district),
+                required=False,
+                label="Assign Circuit",
+                widget=forms.Select(attrs={'class': 'form-control'})
+            )
+
+            self.fields['school'] = forms.ModelChoiceField(
+                queryset=School.objects.filter(circuit__district=self.district),
+                required=False,
+                label="Assign School",
+                widget=forms.Select(attrs={'class': 'form-control'})
+            )
+
+        # Additional dynamic handling based on role selection
+        self.fields['role'].widget.attrs.update({'class': 'form-control'})
+
+    def clean(self):
+        cleaned_data = super().clean()
+        role = cleaned_data.get('role')
+        school = cleaned_data.get('school')
+        circuit = cleaned_data.get('circuit')
+
+        # Validate required relationships based on selected role
+        if role not in dict(User.ROLE_CHOICES):
+            raise forms.ValidationError("Invalid role selected.")
+
+        if role == 'headteacher' and not school:
+            self.add_error('school', "School is required for Headteacher role.")
+        if role == 'siso' and not circuit:
+            self.add_error('circuit', "Circuit is required for SISO role.")
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        role = self.cleaned_data['role']
+
+        # Set common fields
+        user.district = self.district
+        user.role = role
+        user.staff_id = self.cleaned_data['staff_id']
+        user.license_number = self.cleaned_data['license_number']
+        user.phone_number = self.cleaned_data['phone_number']
+
+        # Role-specific fields
+        if role == 'headteacher':
+            user.school = self.cleaned_data.get('school')
+            user.circuit = None  # Headteacher does not need a circuit
+        elif role == 'siso':
+            user.circuit = self.cleaned_data.get('circuit')
+            user.school = None  # SISO does not need a school
+        elif role == 'teacher':
+            user.school = self.school  # Assign school if it's provided
+
+        if commit:
+            user.save()
+
+        return user
+
+
 class NotificationForm(forms.ModelForm):
     recipient = forms.ModelChoiceField(
         queryset=User.objects.filter(role='Headteacher'),  # Filter based on role if needed
@@ -248,5 +232,32 @@ class NotificationForm(forms.ModelForm):
         if send_to_all and recipient is not None:
             raise forms.ValidationError("Cannot select a specific recipient when sending to all Headteachers.")
         return cleaned_data
+    
 
+
+class UserSearchForm(forms.Form):
+    staff_id = forms.IntegerField(label="Staff ID", widget=forms.NumberInput(attrs={'placeholder': 'Enter Staff ID'}))
+
+
+class UserRoleChangeForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['role', 'circuit', 'school']  # Include all potential fields
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields['circuit'] = forms.ModelChoiceField(
+            queryset=Circuit.objects.all(),
+            required=False,
+            label="Circuit",
+            widget=forms.Select(attrs={'class': 'form-control'})
+        )
+
+        self.fields['school'] = forms.ModelChoiceField(
+            queryset=School.objects.all(),
+            required=False,
+            label="School",
+            widget=forms.Select(attrs={'class': 'form-control'})
+        )
 

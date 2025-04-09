@@ -79,23 +79,11 @@ body {
 .sidebar a.logout-link .tooltip::before {
     border-color: transparent red transparent transparent; /* Red arrow for logout */
 }
+
+
 /* Hover effect */
 .sidebar a:hover {
     background-color: rgba(255, 255, 255, 0.1);
-}
-.sidebar a.logout-link:hover {
-    background-color: rgba(255, 0, 0, 0.1); /* Red hover effect for logout */
-}
-
-.logout-link i {
-    color: red;
-}
-.sidebar a.logout-link .tooltip {
-    background-color: red; /* Red background for logout tooltip */
-}
-/* Tooltip Arrow (Pointer) specifically for logout link */
-.sidebar a.logout-link .tooltip::before {
-    border-color: transparent red transparent transparent; /* Red arrow for logout */
 }
 .sidebar a .tooltip {
     visibility: hidden;
@@ -139,7 +127,7 @@ body {
 /* Adjust main content margin */
 .main-content {
     margin-left: 110px; /* Adjusted for sidebar width */
-    margin-top: 70px; /* Adjusted for navbar height */
+    margin-top: 60px; /* Adjusted for navbar height */
     padding: 20px;
     height: calc(100vh - 70px);
     overflow-y: auto;
@@ -152,12 +140,12 @@ body {
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
     .sidebar {
-        width: 70px; /* Smaller sidebar for mobile */
+        width: 30px; /* Smaller sidebar for mobile */
     }
 
     .main-content {
-        margin-left: 90px;
-        margin-top: 70px;
+        margin-left: 30px;
+        margin-top: 50px;
     }
 }
 
@@ -171,6 +159,10 @@ body {
     z-index: 100; /* Ensure tooltips go over cards */
 }
 
+.dashboard-header{
+    margin-bottom: 10px;
+}
+
 .custom-card .card-header {
     background: #d1f2eb;
     padding: 10px 15px;
@@ -180,19 +172,6 @@ body {
 
 .custom-card .card-body {
     padding: 20px;
-}
-
-.dashboard-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: white;
-    border-radius: 10px;
-    padding: 20px;
-    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-    position: relative;
-    border-left: 5px solid #007BFF;
-    min-height: 100px;
 }
 
 .dashboard-card h3 {
@@ -210,14 +189,61 @@ body {
 
 .dashboard-card .icon {
     font-size: 32px;
-    color: #007BFF;
+    color: inherit; /* Inherits text color from parent */
 }
 
-/* Unique colors for each card */
-.total-schools { border-left-color: #28A745; }
-.total-teachers { border-left-color: #17A2B8; }
-.average-district-performance { border-left-color: #FFC107; }
-.active-siso-tasks { border-left-color: #da0367; }
+/* Ensuring the parent container has the correct text color */
+.dashboard-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    position: relative;
+    border-left: 5px solid; /* Default border */
+    min-height: 100px;
+}
+
+/* Assigning both border and text color */
+.total-students-assessed {
+    border-left-color: #02377c; /* Green */
+    color: #02377c;
+}
+
+.total-teachers {
+    border-left-color: #035db1; /* Blue */
+    color: #035db1;
+}
+.total-schools {
+    border-left-color: #004d40; /* Blue */
+    color: #004d40;
+}
+
+.average-district-performance {
+    border-left-color: #027c5b; /* Cyan */
+    color: #027c5b;
+}
+
+.top-performing-subjects {
+    border-left-color: #089d2a; /* Green */
+    color: #089d2a;
+}
+
+.bottom-performing-subjects {
+    border-left-color: #DC3545; /* Red */
+    color: #DC3545;
+}
+
+.best-performing-schools {
+    border-left-color: #03926e; /* Purple */
+    color: #03926e;
+}
+.weakest-performing-schools {
+    border-left-color: #b20432; /* Purple */
+    color: #b20432;
+}
 
 .navbar {
     display: flex;
@@ -277,5 +303,68 @@ body {
 
 .navbar-icons .fas{
     font-size: 22px;
+}
+
+.notification-container {
+    position: relative;
+    display: inline-block;
+}
+
+.btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    position: relative;
+}
+
+.badge {
+    background: red;
+    color: white;
+    font-size: 12px;
+    border-radius: 50%;
+    padding: 5px;
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    display: none;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+    width: 250px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.dropdown-menu.show {
+    display: block;
+}
+
+.notification-item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+
+.notification-item:hover {
+    background: #f5f5f5;
+}
+
+.dropdown-footer {
+    text-align: center;
+    padding: 10px;
+    background: #f9f9f9;
+}
+
+.no-notifications {
+    text-align: center;
+    padding: 10px;
+    color: #777;
 }
 

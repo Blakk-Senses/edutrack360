@@ -174,7 +174,7 @@
 
             container.innerHTML = `
                 <h2 class="text-center">Manual Upload</h2>
-                <form id="manualUploadForm" action="/school/manual_upload/" method="POST" class="p-3 border rounded">
+                <form id="manualUploadForm" action="/school/manual/upload/" method="POST" class="p-3 border rounded">
                     <input type="hidden" name="csrfmiddlewaretoken" value="${getCSRFToken()}">
                     <input type="hidden" name="role" value="teacher">  
                     <div class="mb-3"><label class="form-label">Staff ID:</label><input type="text" class="form-control" name="staff_id" required></div>
@@ -204,7 +204,7 @@
         function loadBulkUploadForm() {
             document.getElementById("templateContainer").innerHTML = `
                 <h2 class="text-center">Bulk Upload</h2>
-                <form id="bulkUploadForm" action="/school/bulk_upload_teachers/" method="POST" enctype="multipart/form-data" class="p-3 border rounded">
+                <form id="bulkUploadForm" action="/school/bulk/upload-teachers/" method="POST" enctype="multipart/form-data" class="p-3 border rounded">
                     <input type="hidden" name="csrfmiddlewaretoken" value="${getCSRFToken()}">
                     <div class="mb-3"><label class="form-label">Upload CSV File:</label><input type="file" class="form-control" name="file" accept=".csv,.xls,.xlsx" required></div>
                     <button type="submit" class="btn btn-success w-100">Upload</button>
@@ -266,8 +266,8 @@
                 <h2 class="text-center">Download Template</h2>
                 <p class="text-center">Click below to download the template:</p>
                 <div class="d-flex justify-content-center gap-2">
-                    <button class="btn btn-primary" onclick="downloadFile('/school/download_teacher_template/csv', 'bulk_teacher_upload_template.csv')">CSV Template</button>
-                    <button class="btn btn-success" onclick="downloadFile('/school/download_teacher_template/excel', 'bulk_teacher_upload_template.xlsx')">Excel Template</button>
+                    <button class="btn btn-primary" onclick="downloadFile('/school/download-teacher-template/csv', 'bulk_teacher_upload_template.csv')">CSV Template</button>
+                    <button class="btn btn-success" onclick="downloadFile('/school/download-teacher-template/excel', 'bulk_teacher_upload_template.xlsx')">Excel Template</button>
                 </div>
             `;
         }
