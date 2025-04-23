@@ -3,9 +3,10 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from datetime import datetime
 from django.core.exceptions import ValidationError
+from django.contrib.auth.forms import PasswordResetForm
 from core.models import (
     Circuit, School, Subject, ClassGroup, Result, Teacher, 
-    Notification, School, Circuit
+    Notification, School, Circuit, Department
 
 )
 from django.contrib.auth.forms import UserCreationForm
@@ -18,38 +19,44 @@ class SubjectForm(forms.ModelForm):
         model = Subject
         fields = ['name', 'department']
 
-
 class AddSchoolForm(forms.ModelForm):
     circuit = forms.ModelChoiceField(
-        queryset=Circuit.objects.none(), 
-        label="Circuit", 
+        queryset=Circuit.objects.none(),
+        label="Circuit",
         required=True
+    )
+
+    departments = forms.ModelMultipleChoiceField(
+        queryset=Department.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Available Departments"
     )
 
     class Meta:
         model = School
-        fields = ['name', 'school_code', 'circuit']
+        fields = ['name', 'school_code', 'circuit', 'departments']
 
     def __init__(self, *args, request=None, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Limit circuits to those within the user's assigned district
+        # Limit circuits to those within the user's district
         if request and hasattr(request.user, 'district'):
             self.fields['circuit'].queryset = Circuit.objects.filter(
                 district=request.user.district
             )
-            self.request = request  # Optional: useful if needed later
+            self.request = request  # Save request for validation use
 
     def clean(self):
         cleaned_data = super().clean()
 
-        # Optional extra safety check (if someone tries to tamper with circuit input)
+        # Safety check for circuit tampering
         circuit = cleaned_data.get('circuit')
         if circuit and hasattr(self.request.user, 'district'):
             if circuit.district != self.request.user.assigned_district:
                 raise ValidationError("Selected circuit does not belong to your district.")
 
-        # Check for duplicate school code
+        # Duplicate school code check
         school_code = cleaned_data.get('school_code')
         if school_code and School.objects.filter(school_code=school_code).exists():
             raise ValidationError("A school with this code already exists.")
@@ -59,11 +66,19 @@ class AddSchoolForm(forms.ModelForm):
 
 
 
+
 class ResultUploadForm(forms.Form):
     class_group = forms.ModelChoiceField(queryset=ClassGroup.objects.all())
     subject = forms.ModelChoiceField(queryset=Subject.objects.none())  # Initially empty
     student_name = forms.CharField(max_length=255)
-    mark = forms.DecimalField(max_digits=5, decimal_places=2, min_value=0, max_value=100)
+
+    # Assessment breakdown fields
+    cat1 = forms.DecimalField(max_digits=5, decimal_places=2, min_value=0, max_value=30)
+    project_work = forms.DecimalField(max_digits=5, decimal_places=2, min_value=0, max_value=20)
+    cat2 = forms.DecimalField(max_digits=5, decimal_places=2, min_value=0, max_value=30)
+    group_work = forms.DecimalField(max_digits=5, decimal_places=2, min_value=0, max_value=20)
+    exam_score = forms.DecimalField(max_digits=5, decimal_places=2, min_value=0, max_value=100)
+
     academic_year = forms.ChoiceField(choices=Result.ACADEMIC_YEAR_CHOICES)
     term = forms.ChoiceField(choices=[("Term 1", "Term 1"), ("Term 2", "Term 2"), ("Term 3", "Term 3")])
 
@@ -78,6 +93,7 @@ class ResultUploadForm(forms.Form):
                 self.fields["subject"].queryset = Subject.objects.none()
         else:
             self.fields["subject"].queryset = Subject.objects.none()
+
 
 
 
@@ -143,12 +159,13 @@ class UserRegistrationForm(UserCreationForm):
         ]
 
     def __init__(self, *args, **kwargs):
-        self.district = kwargs.pop("district", None)  # Passed from view based on logged-in user
+        # Get the district from the logged-in CIS user
+        self.district = kwargs.pop("district", None)
         self.school = kwargs.pop("school", None)
         self.circuit = kwargs.pop("circuit", None)
         super().__init__(*args, **kwargs)
 
-        # Dynamically adjust the circuit and school fields based on district or other context
+        # Only create the fields if the district is present
         if self.district:
             self.fields['circuit'] = forms.ModelChoiceField(
                 queryset=Circuit.objects.filter(district=self.district),
@@ -156,7 +173,6 @@ class UserRegistrationForm(UserCreationForm):
                 label="Assign Circuit",
                 widget=forms.Select(attrs={'class': 'form-control'})
             )
-
             self.fields['school'] = forms.ModelChoiceField(
                 queryset=School.objects.filter(circuit__district=self.district),
                 required=False,
@@ -164,7 +180,6 @@ class UserRegistrationForm(UserCreationForm):
                 widget=forms.Select(attrs={'class': 'form-control'})
             )
 
-        # Additional dynamic handling based on role selection
         self.fields['role'].widget.attrs.update({'class': 'form-control'})
 
     def clean(self):
@@ -173,7 +188,7 @@ class UserRegistrationForm(UserCreationForm):
         school = cleaned_data.get('school')
         circuit = cleaned_data.get('circuit')
 
-        # Validate required relationships based on selected role
+        # Removed district validation since it is inherited from the logged-in user
         if role not in dict(User.ROLE_CHOICES):
             raise forms.ValidationError("Invalid role selected.")
 
@@ -186,29 +201,44 @@ class UserRegistrationForm(UserCreationForm):
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        role = self.cleaned_data['role']
 
-        # Set common fields
-        user.district = self.district
-        user.role = role
+        # Set the district inherited from the logged-in CIS user
+        user.district = self.district  # This should come from the view or session
+
+        user.role = self.cleaned_data['role']
         user.staff_id = self.cleaned_data['staff_id']
         user.license_number = self.cleaned_data['license_number']
         user.phone_number = self.cleaned_data['phone_number']
 
-        # Role-specific fields
-        if role == 'headteacher':
-            user.school = self.cleaned_data.get('school')
-            user.circuit = None  # Headteacher does not need a circuit
-        elif role == 'siso':
-            user.circuit = self.cleaned_data.get('circuit')
-            user.school = None  # SISO does not need a school
-        elif role == 'teacher':
-            user.school = self.school  # Assign school if it's provided
+        # Clean up any associations just in case
+        user.school = None
+        user.circuit = None
+
+        # Assign school/circuit based on the role
+        if user.role == 'headteacher':
+            assigned_school = self.cleaned_data.get('school')
+            user.school = assigned_school
+        elif user.role == 'siso':
+            assigned_circuit = self.cleaned_data.get('circuit')
+            user.circuit = assigned_circuit
+        elif user.role == 'teacher':
+            user.school = self.school
 
         if commit:
             user.save()
 
+            # Set reverse relationship: assign the user as siso/headteacher
+            if user.role == 'headteacher' and user.school:
+                user.school.headteacher = user
+                user.school.save()
+            elif user.role == 'siso' and user.circuit:
+                user.circuit.siso = user
+                user.circuit.save()
+
         return user
+
+
+
 
 
 class NotificationForm(forms.ModelForm):
@@ -232,32 +262,11 @@ class NotificationForm(forms.ModelForm):
         if send_to_all and recipient is not None:
             raise forms.ValidationError("Cannot select a specific recipient when sending to all Headteachers.")
         return cleaned_data
-    
 
 
-class UserSearchForm(forms.Form):
-    staff_id = forms.IntegerField(label="Staff ID", widget=forms.NumberInput(attrs={'placeholder': 'Enter Staff ID'}))
 
-
-class UserRoleChangeForm(forms.ModelForm):
-    class Meta:
-        model = User
-        fields = ['role', 'circuit', 'school']  # Include all potential fields
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.fields['circuit'] = forms.ModelChoiceField(
-            queryset=Circuit.objects.all(),
-            required=False,
-            label="Circuit",
-            widget=forms.Select(attrs={'class': 'form-control'})
-        )
-
-        self.fields['school'] = forms.ModelChoiceField(
-            queryset=School.objects.all(),
-            required=False,
-            label="School",
-            widget=forms.Select(attrs={'class': 'form-control'})
-        )
-
+class CustomPasswordResetForm(PasswordResetForm):
+    def get_users(self, email):
+        """Override to silently check for existing emails."""
+        active_users = User._default_manager.filter(email__iexact=email, is_active=True)
+        return (u for u in active_users if u.has_usable_password())

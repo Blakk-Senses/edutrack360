@@ -19,14 +19,16 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from core.views.view_common import (
-    homepage, unified_login, logout_view,
+    homepage, unified_login, logout_view, admin_login,
 )
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', homepage, name='homepage'),
-    path('login/', unified_login, name='login'),
+    path('login/admin/', admin_login, name='admin_login'),
+
+    path('login/user/', unified_login, name='login'),
     path('logout/', logout_view, name='logout'),
 
 
@@ -40,10 +42,10 @@ urlpatterns = [
     path('teacher/', include('core.urls.teacher', namespace='teacher')),
 
     # --- PASSWORD MANAGEMENT ---
-    path('password_reset/', auth_views.PasswordResetView.as_view(template_name='password_reset.html'), name='password_reset'),
-    path('password_reset_done/', auth_views.PasswordResetDoneView.as_view(template_name='password_reset_done.html'), name='password_reset_done'),
-    path('password_reset_confirm/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(template_name='password_reset_confirm.html'), name='password_reset_confirm'),
-    path('password_reset_complete/', auth_views.PasswordResetCompleteView.as_view(template_name='password_reset_complete.html'), name='password_reset_complete'),
+    path('password_reset/', auth_views.PasswordResetView.as_view(template_name='commons/password_reset.html'), name='password_reset'),
+    path('password_reset_done/', auth_views.PasswordResetDoneView.as_view(template_name='commons/password_reset_done.html'), name='password_reset_done'),
+    path('password_reset_confirm/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(template_name='commons/password_reset_confirm.html'), name='password_reset_confirm'),
+    path('password_reset_complete/', auth_views.PasswordResetCompleteView.as_view(template_name='commons/password_reset_complete.html'), name='password_reset_complete'),
     
 ]
 

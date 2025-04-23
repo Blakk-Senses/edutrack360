@@ -10,10 +10,11 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         body {
+            overflow: auto;
             font-family: 'Calibri', sans-serif;
             margin: 0;
             background-color: #e0f7fa;
-            padding-top: 50px; /* Ensures content doesn't overlap with navbar */
+            padding-top: 80px; /* Ensures content doesn't overlap with navbar */
         }
 
         .navbar {
@@ -31,13 +32,101 @@
             height: auto;
         }
 
-        .container {
-            margin-left: 100px; /* Space for sidebar */
-            padding: 20px;
-            overflow-y: auto;
+        .navbar-icons {
+            display: flex;
+            align-items: center;
+            gap: 20px;
         }
-        .nav-pills .nav-link.active {
-            color: white !important; 
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .btn-custom {
+            font-size: 16px;
+        }
+
+        .template-container {
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+        }
+
+        .btn-custom {
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 12px;
+            border: none;
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px; /* Adjust spacing between buttons */
+        }
+
+
+        .alert {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(0);
+            z-index: 1000;
+            width: 50%;
+            text-align: center;
+            font-weight: bold;
+            opacity: 0;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .btn-custom:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #545b62);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #1e7e34);
+            color: white;
+        }
+
+        .text-center {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        @media (max-width: 768px) {
+            .logo-img {
+                max-width: 100px;
+                
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo-img {
+                max-width: 80px;
+                
+            }
         }
     </style>
 </head>

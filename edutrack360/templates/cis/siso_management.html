@@ -40,6 +40,86 @@
         .nav-pills .nav-link.active {
             color: white !important;
         }
+        @media (max-width: 768px) {
+            .nav-pills .nav-link {
+                font-size: 14px;
+                padding: 6px 10px;
+                margin: 0 4px;
+            }
+
+            .nav-pills .nav-link i {
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin-left: 0px;
+            }
+            .nav-pills .nav-link {
+                font-size: 12px;
+                padding: 4px 8px;
+                margin: 0 2px;
+            }
+
+            .nav-pills .nav-link i {
+                font-size: 12px;
+            }
+        }
+        @media (max-width: 768px) {
+            .tab-content .tab-pane {
+                padding: 15px;
+            }
+
+            .tab-content h4 {
+                font-size: 18px;
+            }
+
+            .form-control {
+                font-size: 14px;
+                padding: 8px 10px;
+            }
+
+            .btn {
+                font-size: 14px;
+                padding: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .tab-content .tab-pane {
+                padding: 10px;
+            }
+
+            .tab-content h4 {
+                font-size: 16px;
+            }
+
+            .form-control {
+                font-size: 13px;
+                padding: 6px 8px;
+            }
+
+            .btn {
+                font-size: 13px;
+                padding: 8px;
+            }
+        }
+        @media (max-width: 768px) {
+            .logo-img {
+                max-width: 80px;
+                
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo-img {
+                max-width: 80px;
+                
+            }
+        }
+
+
     </style>
 </head>
 <body>
@@ -135,9 +215,10 @@
                     </div>
                     <div class="mb-3">
                         <label for="new-circuit" class="fw-semibold">Select New Circuit:</label>
-                        <select class="form-control border-secondarywarning
+                        <select class="form-control border-warning" id="new-circuit">
                             <option value="">Select New Circuit</option>
                         </select>
+                        
                     </div>
                     <button type="submit" class="btn btn-warning w-100">
                         <i class="fas fa-exchange-alt me-1"></i> Reassign SISO

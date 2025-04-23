@@ -30,21 +30,21 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'handlers': {
-        'console': {  
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-        },
-        'file': {  
+        'file': {
             'level': 'DEBUG',
             'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'filename': 'debug.log',  # log file name in the same folder as manage.py
         },
     },
-    'root': {
-        'handlers': ['console', 'file'],
-        'level': 'DEBUG',
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
     },
 }
+
 
 
 ALLOWED_HOSTS = [
@@ -122,8 +122,12 @@ CHANNEL_LAYERS = {
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'edutrack360',  # The name of the PostgreSQL database you just created
+        'USER': 'edutrack_user',  # The PostgreSQL user you created
+        'PASSWORD': 'selinam7',  # The password for the PostgreSQL user
+        'HOST': 'localhost',  # Use 'localhost' if your PostgreSQL is on the same machine
+        'PORT': '5432',  # The default PostgreSQL port
     }
 }
 
@@ -132,17 +136,53 @@ import os
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name} | {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '[{levelname}] {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
-        'console': {  # Logs to console
-            'level': 'DEBUG',
+        'console': {
+            'level': 'WARNING',  # Show only warnings and errors in terminal
             'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'file': {
+            'level': 'DEBUG',  # Keep full debug logs in file
+            'class': 'logging.FileHandler',
+            'filename': 'debug.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['console', 'file'],
+            'level': 'ERROR',  # Suppress GET/POST logspam
+            'propagate': False,
+        },
+        'core.backends': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
         },
     },
     'root': {
         'handlers': ['console'],
-        'level': 'DEBUG',  # Log everything from DEBUG level and above
+        'level': 'WARNING',
     },
 }
+
+
 
 
 
@@ -155,6 +195,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'your_email@example.com'
 EMAIL_HOST_PASSWORD = 'your_email_password'
+
 
 
 
@@ -176,7 +217,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-AUTHENTICATION_BACKENDS = ['core.backend.StaffIDBackend']
+AUTHENTICATION_BACKENDS = [
+    'core.backends.EmailOrStaffIDBackend',
+    'core.backends.StaffIDBackend'
+]
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/

@@ -9,8 +9,17 @@ from django.utils import timezone
 
 
 
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.db import models
+from django.core.validators import MinLengthValidator, RegexValidator
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
+from core.managers import UserManager  # Ensure you have a custom manager
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = [
+        ('admin', 'Admin'),
         ('cis', 'Chief Inspector of Schools'),
         ('siso', 'School Improvement Support Officer'),
         ('headteacher', 'Headteacher'),
@@ -23,6 +32,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name="User Role",
         help_text="Designates the role assigned to the user."
     )
+
     school = models.ForeignKey(
         'core.School',
         on_delete=models.CASCADE,
@@ -30,28 +40,34 @@ class User(AbstractBaseUser, PermissionsMixin):
         blank=True,
         related_name='staff_members'
     )
-    staff_id = models.IntegerField(unique=True, db_index=True)
+
+    staff_id = models.CharField(max_length=20, unique=True, db_index=True)  # Now CharField to allow '00000000'
+
     license_number = models.CharField(
         max_length=50,
         unique=True,
+        null=True,
+        blank=True,
         validators=[MinLengthValidator(5)]
     )
+
     email = models.EmailField(unique=True)
-    first_name = models.CharField(max_length=50)
+    first_name = models.CharField(max_length=50, null=True, blank=True)
     middle_name = models.CharField(max_length=50, null=True, blank=True)
-    last_name = models.CharField(max_length=50)
+    last_name = models.CharField(max_length=50, null=True, blank=True)
 
     district = models.ForeignKey(
-        'core.District', 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        'core.District',
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name='users'
     )
+
     circuit = models.ForeignKey(
-        'core.Circuit', 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        'core.Circuit',
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name='users'
     )
@@ -62,6 +78,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         null=True,
         validators=[RegexValidator(r'^\+?1?\d{9,15}$', _('Enter a valid phone number.'))],
     )
+
     last_login = models.DateTimeField(blank=True, null=True, verbose_name='last login')
     is_staff = models.BooleanField(default=False, verbose_name='staff status')
     is_active = models.BooleanField(default=True, verbose_name='active')
@@ -72,7 +89,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     password_changed = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'staff_id'
-    REQUIRED_FIELDS = ['first_name', 'last_name', 'email']
+    REQUIRED_FIELDS = ['email']  # staff_id is the USERNAME_FIELD, email is required manually
 
     objects = UserManager()
 
@@ -84,33 +101,78 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def clean(self):
         super().clean()
+
+        # Clean the email field
         self.clean_email()
+
+        # Check if the role is valid
         if self.role not in dict(self.ROLE_CHOICES):
             raise ValidationError(_("Invalid role. Choose from the predefined roles."))
 
+        # For non-admin roles, check the required fields
+        if self.role != 'admin':  # Only non-admin users need these fields
+            if not self.first_name or not self.last_name:
+                raise ValidationError(_("First name and last name are required for non-admin users."))
+            if not self.license_number:
+                raise ValidationError(_("License number is required for non-admin users."))
+
+            # District check only required for non-admin roles if it is not set from the form
+            if not self.district:
+                raise ValidationError(_("District is required for non-admin users."))
+
+            # Circuit check for SISO, Headteacher, and Teacher roles
+            if self.role in ['siso', 'headteacher', 'teacher'] and not self.circuit:
+                raise ValidationError(_("Circuit is required for SISO, Headteacher, and Teacher users."))
+            
+            # School check for Headteacher role
+            if self.role == 'headteacher' and not self.school:
+                raise ValidationError(_("School is required for Headteacher users."))
+
+
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.staff_id})"
+        return f"{self.first_name or ''} {self.last_name or ''} ({self.staff_id})"
 
 
-class District(models.Model):
-    name = models.CharField(max_length=100)
-    region = models.CharField(max_length=100)
-    
-    cis = models.OneToOneField(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        related_name='assigned_district'
-    )
-
-    def clean(self):
-        if self.cis and District.objects.filter(cis=self.cis).exclude(id=self.id).exists():
-            raise ValidationError("This CIS has already been assigned to another district.")
+class Region(models.Model):
+    name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.name
+    
+class District(models.Model):
+    name = models.CharField(max_length=100)
+    region = models.ForeignKey('core.Region', on_delete=models.CASCADE, related_name='districts')  # if using FK
+    # region = models.CharField(max_length=100)  # if sticking to CharField
 
+    cis = models.OneToOneField(
+        'core.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_district_cis',
+        limit_choices_to={'role': 'cis'},
+    )
+
+    admin = models.OneToOneField(
+        'core.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_district_admin',
+        limit_choices_to={'role': 'admin'},
+    )
+
+    def clean(self):
+        errors = {}
+        if self.cis and District.objects.filter(cis=self.cis).exclude(id=self.id).exists():
+            errors['cis'] = ValidationError("This CIS is already assigned to another district.")
+        if self.admin and District.objects.filter(admin=self.admin).exclude(id=self.id).exists():
+            errors['admin'] = ValidationError("This Admin is already assigned to another district.")
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        return self.name
 
 class Circuit(models.Model):
     name = models.CharField(max_length=100)
@@ -478,6 +540,44 @@ class PerformanceSummary(models.Model):
         level = "District" if self.district else "Circuit" if self.circuit else "School"
         departments = ", ".join(dept.name for dept in self.department.all())  # Handle ManyToManyField
         return f"{level} Summary - {departments} - {self.term} {self.year}"
+    
+
+
+class ResultUploadDeadline(models.Model):
+    ACADEMIC_YEAR_CHOICES = [
+        (f"{year}/{year+1}", f"{year}/{year+1}") for year in range(2000, 2100)
+    ]
+
+    district = models.ForeignKey(District, on_delete=models.CASCADE)
+    
+    term = models.CharField(max_length=20)
+    
+    academic_year = models.CharField(
+        max_length=9,
+        choices=ACADEMIC_YEAR_CHOICES,
+        default=f"{timezone.now().year}/{timezone.now().year + 1}"
+    )
+    
+    deadline_date = models.DateField()
+    
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('district', 'academic_year', 'term')
+
+    def __str__(self):
+        return f"{self.district} - {self.academic_year} {self.term}"
+    
+
+# Pseudocode only for now
+class ResultUploadNotification(models.Model):
+    result = models.ForeignKey('core.Result', on_delete=models.CASCADE)
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE)  # Headteacher
+    is_seen = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 
 
 class ClassGroup(models.Model):  # Renamed from Class to ClassGroup
@@ -509,11 +609,6 @@ class Subject(models.Model):
     )
     def __str__(self):
         return self.name
-
-
-from django.db import models
-from django.utils import timezone
-from django.core.validators import MinValueValidator, MaxValueValidator
 
 class Result(models.Model):
     STATUS_CHOICES = [
@@ -551,10 +646,22 @@ class Result(models.Model):
         blank=True, null=True, 
         related_name="results"
     )
-    mark = models.DecimalField(
-        max_digits=5, decimal_places=2,
-        validators=[MinValueValidator(0), MaxValueValidator(100)]
-    )
+    cat1 = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    project_work = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    cat2 = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    group_work = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
+    total_ca = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    ca_50 = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
+    exam_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    exam_50 = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
+    final_mark = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
+    position = models.PositiveIntegerField(null=True, blank=True)
+    remark = models.CharField(max_length=50, null=True, blank=True)
+
     teacher = models.ForeignKey(
         'core.User',
         on_delete=models.CASCADE,

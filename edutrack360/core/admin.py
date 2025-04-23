@@ -149,7 +149,7 @@ class SchoolAdmin(admin.ModelAdmin):
 
 # Registering the Result model
 class ResultAdmin(admin.ModelAdmin):
-    list_display = ('student', 'subject', 'mark', 'class_group', 'teacher', 'term', 'academic_year')
+    list_display = ('student', 'subject', 'final_mark', 'class_group', 'teacher', 'term', 'academic_year')
     search_fields = ('student_name', 'subject', 'class_group', 'term')
     list_filter = ('term', 'academic_year',)
     

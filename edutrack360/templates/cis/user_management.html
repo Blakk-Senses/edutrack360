@@ -12,7 +12,7 @@
             font-family: 'Calibri', sans-serif;
             margin: 0;
             background-color: #e0f7fa;
-            padding-top: 80px; /* Ensures content doesn't overlap with navbar */
+            padding-top: 50px; /* Ensures content doesn't overlap with navbar */
         }
 
         .navbar {
@@ -30,15 +30,27 @@
             height: auto;
         }
 
-        .navbar-icons {
-            display: flex;
-            align-items: center;
-            gap: 20px;
+        .container {
+            margin-left: 100px;
+            margin-top: 60px;
+            padding: 20px;
         }
 
-        .container {
-            max-width: 900px;
-            margin-top: 30px;
+        @media (max-width: 768px) {
+            .container {
+                margin-left: 60px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin-left: 0px;
+                margin-top: 20px;
+            }
+            .logo-img {
+                max-width: 90px;
+                height: auto;
+            }
         }
 
         .btn-custom {
@@ -155,66 +167,66 @@
         </div>
 
         <!-- Search User -->
-        <div id="search-form-container" class="form-container active-form">
-            <div class="form-section">
-                <h3 class="form-title">Search User</h3>
-                <form id="user-search-form" class="row align-items-center mb-4">
-                    <div class="col-md-12 d-flex">
-                        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
-                        <input type="number" id="staff_id" name="staff_id" class="form-control me-2" placeholder="Enter Staff ID" required>
-                        <button type="submit" class="btn btn-primary col-md-3">Search</button>
-                    </div>
-                </form>
-                <div id="search-result" class="mt-4"></div>
-            </div>
-        </div>
-
-        <!-- Create User -->
-        <div id="create-form-container" class="form-container">
-            <div class="form-section">
-                <h3 class="form-title">Create New User</h3>
-                <form id="create-user-form">
+    <div id="search-form-container" class="form-container active-form">
+        <div class="form-section">
+            <h3 class="form-title">Search User</h3>
+            <div class="row align-items-center mb-4">
+                <div class="col-md-12 d-flex">
                     <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
-                    <div class="mb-3"><input type="text" name="first_name" class="form-control" placeholder="First Name" required></div>
-                    <div class="mb-3"><input type="text" name="last_name" class="form-control" placeholder="Last Name" required></div>
-                    <div class="mb-3"><input type="email" name="email" class="form-control" placeholder="Email" required></div>
-                    <div class="mb-3"><input type="text" name="phone_number" class="form-control" placeholder="Phone Number"></div>
-                    <div class="mb-3"><input type="number" name="staff_id" class="form-control" placeholder="Staff ID" required></div>
-                    <div class="mb-3"><input type="text" name="license_number" class="form-control" placeholder="License Number" required></div>
-
-                    <div class="mb-3">
-                        <select name="role" id="role" class="form-select" required>
-                            <option value="">Select Role</option>
-                        </select>
-                    </div>
-
-                    <!-- Password Fields -->
-                    <div class="mb-3">
-                        <input type="password" name="password1" class="form-control" placeholder="Password" required>
-                    </div>
-                    <div class="mb-3">
-                        <input type="password" name="password2" class="form-control" placeholder="Confirm Password" required>
-                    </div>
-
-                    <div class="mb-3" id="update-school-container" style="display:none;">
-                        <select name="school" id="school" class="form-select">
-                            <option value="">Select School</option>
-                        </select>
-                    </div>
-                    <div class="mb-3" id="update-circuit-container" style="display:none;">
-                        <select name="circuit" id="circuit" class="form-select">
-                            <option value="">Select Circuit</option>
-                        </select>
-                    </div>
-
-                    <div class="form-button-container shadow-sm border rounded px-4 py-3 mt-4">
-                        <button type="submit" class="btn btn-outline-success w-100">Create User</button>
-                    </div>
-                </form>
-                <div id="create-result" class="mt-4"></div>
+                    <input type="number" id="staff_id" class="form-control me-2" placeholder="Enter Staff ID" required>
+                    <button type="button" id="search-btn" class="btn btn-primary col-md-3">Search</button>
+                </div>
             </div>
+            <div id="search-result" class="mt-4"></div>
         </div>
     </div>
+
+    <!-- Create User -->
+    <div id="create-form-container" class="form-container">
+        <div class="form-section">
+            <h3 class="form-title">Create New User</h3>
+            <form id="create-user-form">
+                <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                <div class="mb-3"><input type="text" name="first_name" class="form-control" placeholder="First Name" required></div>
+                <div class="mb-3"><input type="text" name="last_name" class="form-control" placeholder="Last Name" required></div>
+                <div class="mb-3"><input type="email" name="email" class="form-control" placeholder="Email" required></div>
+                <div class="mb-3"><input type="text" name="phone_number" class="form-control" placeholder="Phone Number"></div>
+                <div class="mb-3"><input type="number" name="staff_id" class="form-control" placeholder="Staff ID" required></div>
+                <div class="mb-3"><input type="text" name="license_number" class="form-control" placeholder="License Number" required></div>
+
+                <div class="mb-3">
+                    <select name="role" id="role" class="form-select" required>
+                        <option value="">Select Role</option>
+                    </select>
+                </div>
+
+                <!-- Password Fields -->
+                <div class="mb-3">
+                    <input type="password" name="password1" class="form-control" placeholder="Password" required>
+                </div>
+                <div class="mb-3">
+                    <input type="password" name="password2" class="form-control" placeholder="Confirm Password" required>
+                </div>
+
+                <div class="mb-3" id="update-school-container" style="display:none;">
+                    <select name="school" id="school" class="form-select">
+                        <option value="">Select School</option>
+                    </select>
+                </div>
+                <div class="mb-3" id="update-circuit-container" style="display:none;">
+                    <select name="circuit" id="circuit" class="form-select">
+                        <option value="">Select Circuit</option>
+                    </select>
+                </div>
+
+                <div class="form-button-container shadow-sm border rounded px-4 py-3 mt-4">
+                    <button type="submit" class="btn btn-outline-success w-100">Create User</button>
+                </div>
+            </form>
+            <div id="create-result" class="mt-4"></div>
+        </div>
+    </div>
+
     <!-- Modal -->
     <div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -232,101 +244,42 @@
             </div>
         </div>
     </div>
+    
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const searchBtn = document.getElementById('search-btn');
+            const searchResultContainer = document.getElementById('search-result');
             const searchFormContainer = document.getElementById('search-form-container');
             const createFormContainer = document.getElementById('create-form-container');
             const schoolContainer = document.getElementById('update-school-container');
             const circuitContainer = document.getElementById('update-circuit-container');
+            const createRoleSelect = document.getElementById('role');
     
-            // Toggle between search form and create form
+            // Toggle Search and Create User Sections
             document.getElementById('search-toggle').onclick = () => {
                 searchFormContainer.style.display = 'block';
                 createFormContainer.style.display = 'none';
             };
+    
             document.getElementById('create-toggle').onclick = () => {
                 createFormContainer.style.display = 'block';
                 searchFormContainer.style.display = 'none';
             };
     
-            // Function to populate the options in the select dropdown dynamically
-            function populateOptions(endpoint, selectId, selected = '') {
-                fetch(endpoint)
-                    .then(res => res.json())
-                    .then(data => {
-                        const select = document.getElementById(selectId);
-                        select.innerHTML = `<option value="">Select ${selectId.charAt(0).toUpperCase() + selectId.slice(1)}</option>`;
-                        data.forEach(item => {
-                            const opt = document.createElement('option');
-                            opt.value = item.id;
-                            opt.textContent = item.name;
-                            if (item.name === selected) opt.selected = true;
-                            select.appendChild(opt);
-                        });
-                    });
-            }
-    
-            // Function to show a modal with a message
-            function showModal(message, isSuccess = true) {
-                const modalContent = document.getElementById('modalMessageContent');
-                const modal = new bootstrap.Modal(document.getElementById('responseModal'));
-                modalContent.innerHTML = `<div class="alert ${isSuccess ? 'alert-success' : 'alert-danger'}">${message}</div>`;
-                modal.show();
-            }
-    
-            // Handle role change for create user form
-            function handleCreateRoleChange(event) {
-                const selectedRole = event.target.value.toLowerCase();  // Get the selected role id (e.g., 'siso', 'headteacher', etc.)
-                console.log(selectedRole);  // Log this to check the role value
-    
-                if (selectedRole === 'siso') {
-                    circuitContainer.style.display = 'block';
-                    schoolContainer.style.display = 'none';
-                    populateOptions('/cis/circuits/', 'circuit');
-                } else if (selectedRole === 'headteacher') {
-                    schoolContainer.style.display = 'block';
-                    circuitContainer.style.display = 'none';
-                    populateOptions('/cis/schools/', 'school');
-                } else {
-                    schoolContainer.style.display = 'none';
-                    circuitContainer.style.display = 'none';
-                }
-            }
-    
-            // Load roles dynamically for select dropdown
-            function loadRoles(selectId, selected = '', onChangeHandler = null) {
-                fetch('/cis/user/roles/')
-                    .then(res => res.json())
-                    .then(data => {
-                        const roleSelect = document.getElementById(selectId);
-                        roleSelect.innerHTML = '<option value="">Select Role</option>';
-                        data.roles.forEach(role => {
-                            const opt = document.createElement('option');
-                            opt.value = role.id;  // Use the id as the value
-                            opt.textContent = role.name;
-                            if (role.name.toLowerCase() === selected.toLowerCase()) opt.selected = true;
-                            roleSelect.appendChild(opt);
-                        });
-    
-                        // Attach the change event handler here if it is passed
-                        if (onChangeHandler) {
-                            roleSelect.addEventListener('change', onChangeHandler);
-                        }
-    
-                        // Manually trigger the change event after roles are loaded
-                        roleSelect.dispatchEvent(new Event('change')); // Ensure the role change logic runs immediately after loading
-                    });
-            }
-    
-            // Initial load of create form role dropdown
+            // Load roles into create form and bind change event
             loadRoles('role', '', handleCreateRoleChange);
     
-            // Handle user search form submission
-            document.getElementById('user-search-form').onsubmit = function (e) {
-                e.preventDefault();
+            // Handle Search Button Click
+            searchBtn.onclick = function () {
                 const staffId = document.getElementById('staff_id').value;
+    
+                if (!staffId) {
+                    alert("Please enter a staff ID.");
+                    return;
+                }
+    
                 fetch('/cis/user/search/', {
                     method: 'POST',
                     headers: {
@@ -337,19 +290,19 @@
                 })
                 .then(res => res.json())
                 .then(data => {
-                    const result = document.getElementById('search-result');
                     if (data.success) {
+                        const user = data.searched_user;
                         let html = `
                             <div class="alert alert-info">
-                                <strong>${data.searched_user.first_name} ${data.searched_user.last_name}</strong><br>
-                                Staff ID: ${data.searched_user.staff_id}<br>
-                                Email: ${data.searched_user.email}<br>
-                                Phone: ${data.searched_user.phone_number}<br>
-                                License number: ${data.searched_user.license_number}<br>
-                                Role: ${data.searched_user.role}
+                                <strong>${user.first_name} ${user.last_name}</strong><br>
+                                Staff ID: ${user.staff_id}<br>
+                                Email: ${user.email}<br>
+                                Phone: ${user.phone_number}<br>
+                                License: ${user.license_number}<br>
+                                Role: ${user.role}
                             </div>
                             <form id="role-change-form">
-                                <input type="hidden" name="staff_id" value="${data.searched_user.staff_id}">
+                                <input type="hidden" name="staff_id" value="${user.staff_id}">
                                 <div class="mb-3">
                                     <label class="form-label">Change Role</label>
                                     <select name="role" id="role-select" class="form-select" required></select>
@@ -365,62 +318,133 @@
                                 <button type="submit" class="btn btn-outline-success w-100">Update Role</button>
                             </form>
                         `;
-                        result.innerHTML = html;
+                        searchResultContainer.innerHTML = html;
     
-                        function handleUpdateRoleChange(e) {
-                            const selectedRole = e.target.value.toLowerCase();
-                            if (selectedRole === 'siso') {
-                                document.getElementById('update-circuit-container').style.display = 'block';
-                                document.getElementById('update-school-container').style.display = 'none';
-                                populateOptions('/cis/circuits/', 'update-circuit');
-                            } else if (selectedRole === 'headteacher') {
-                                document.getElementById('update-school-container').style.display = 'block';
-                                document.getElementById('update-circuit-container').style.display = 'none';
-                                populateOptions('/cis/schools/', 'update-school');
-                            } else {
-                                document.getElementById('update-school-container').style.display = 'none';
-                                document.getElementById('update-circuit-container').style.display = 'none';
-                            }
-                        }
-    
-                        loadRoles('role-select', data.searched_user.role, handleUpdateRoleChange);
+                        loadRoles('role-select', user.role, handleUpdateRoleChange);
     
                         document.getElementById('role-change-form').onsubmit = function (e) {
                             e.preventDefault();
+    
                             const formData = new FormData(this);
-                            formData.append('role_change', true);
+                            formData.append('role_change', 'true');
+    
                             fetch('/cis/user/search/', {
                                 method: 'POST',
-                                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                                headers: {
+                                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                                },
                                 body: formData
                             })
                             .then(res => res.json())
                             .then(data => {
-                                if (data.success) {
-                                    showModal(data.message, true);
-                                } else {
-                                    showModal(data.message || 'Error updating role', false);
-                                }
+                                showModal(data.message || (data.success ? "User updated successfully" : "Failed to update user"), data.success);
+                            })
+                            .catch(error => {
+                                console.error('Error updating user:', error);
+                                showModal("Unexpected error occurred while updating user.", false);
                             });
                         };
                     } else {
-                        showModal(data.message, false);
+                        searchResultContainer.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
                     }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    searchResultContainer.innerHTML = `<div class="alert alert-danger">Error fetching user data.</div>`;
                 });
             };
     
-            // Handle create user form submission
+            // Handle Role Change for Search Form
+            function handleUpdateRoleChange(e) {
+                const selectedRole = e.target.value.toLowerCase();
+                const schoolDiv = document.getElementById('update-school-container');
+                const circuitDiv = document.getElementById('update-circuit-container');
+    
+                if (selectedRole === 'siso') {
+                    circuitDiv.style.display = 'block';
+                    schoolDiv.style.display = 'none';
+                    populateOptions('/cis/circuits/', 'update-circuit');
+                } else if (selectedRole === 'headteacher') {
+                    schoolDiv.style.display = 'block';
+                    circuitDiv.style.display = 'none';
+                    populateOptions('/cis/schools/', 'update-school');
+                } else {
+                    schoolDiv.style.display = 'none';
+                    circuitDiv.style.display = 'none';
+                }
+            }
+    
+            // Handle Role Change for Create Form
+            function handleCreateRoleChange(e) {
+                const selectedRole = e.target.value.toLowerCase();
+                if (selectedRole === 'siso') {
+                    circuitContainer.style.display = 'block';
+                    schoolContainer.style.display = 'none';
+                    populateOptions('/cis/circuits/', 'circuit');
+                } else if (selectedRole === 'headteacher') {
+                    schoolContainer.style.display = 'block';
+                    circuitContainer.style.display = 'none';
+                    populateOptions('/cis/schools/', 'school');
+                } else {
+                    schoolContainer.style.display = 'none';
+                    circuitContainer.style.display = 'none';
+                }
+            }
+    
+            // Load role options dynamically
+            function loadRoles(selectId, selectedRole = '', onChangeHandler = null) {
+                fetch('/cis/user/roles/')
+                    .then(res => res.json())
+                    .then(data => {
+                        const roleSelect = document.getElementById(selectId);
+                        roleSelect.innerHTML = '<option value="">Select Role</option>';
+                        data.roles.forEach(role => {
+                            const option = document.createElement('option');
+                            option.value = role.id;
+                            option.textContent = role.name;
+                            if (role.name.toLowerCase() === selectedRole.toLowerCase()) option.selected = true;
+                            roleSelect.appendChild(option);
+                        });
+                        if (onChangeHandler) {
+                            roleSelect.addEventListener('change', onChangeHandler);
+                        }
+                    })
+                    .catch(error => console.error('Error loading roles:', error));
+            }
+    
+            // Populate circuits or schools
+            function populateOptions(endpoint, selectId) {
+                fetch(endpoint)
+                    .then(res => res.json())
+                    .then(data => {
+                        const select = document.getElementById(selectId);
+                        select.innerHTML = `<option value="">Select ${selectId.charAt(0).toUpperCase() + selectId.slice(1)}</option>`;
+                        data.forEach(item => {
+                            const opt = document.createElement('option');
+                            opt.value = item.id;
+                            opt.textContent = item.name;
+                            select.appendChild(opt);
+                        });
+                    })
+                    .catch(error => console.error('Error loading options:', error));
+            }
+    
+            // Handle Create User Form
             document.getElementById('create-user-form').onsubmit = function (e) {
                 e.preventDefault();
                 const formData = new FormData(this);
                 fetch('/cis/user/create/', {
                     method: 'POST',
-                    headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
                     body: formData
                 })
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) throw res;
+                    return res.json();
+                })
                 .then(data => {
-                    const result = document.getElementById('create-result');
                     if (data.success) {
                         showModal('User created successfully!', true);
                         this.reset();
@@ -429,8 +453,24 @@
                     } else {
                         showModal(data.errors || 'Error creating user', false);
                     }
+                })
+                .catch(async err => {
+                    let errorMessage = 'Failed to create user.';
+                    try {
+                        const errJson = await err.json();
+                        errorMessage = errJson.message || JSON.stringify(errJson.errors);
+                    } catch (e) {}
+                    showModal(errorMessage, false);
                 });
             };
+    
+            // Show modal notifications
+            function showModal(message, isSuccess = true) {
+                const modalContent = document.getElementById('modal-message-body');
+                const modal = new bootstrap.Modal(document.getElementById('messageModal'));
+                modalContent.innerHTML = `<div class="alert ${isSuccess ? 'alert-success' : 'alert-danger'}">${message}</div>`;
+                modal.show();
+            }
         });
     </script>
     

@@ -6,33 +6,25 @@ from decimal import Decimal
 
 # Third-party libraries
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from openpyxl import Workbook
 from reportlab.lib import colors
-from reportlab.lib.colors import HexColor
-from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.units import mm
-from reportlab.pdfgen import canvas
 from reportlab.platypus import (
-    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer,
 )
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics.charts.barcharts import VerticalBarChart
-from reportlab.graphics.charts.textlabels import Label
 
 # Django core
-from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
-from django.db.models import Count, Q, Max, Avg
-from django.http import JsonResponse, HttpResponse, Http404, HttpResponseForbidden
-from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import Count, Q, Max
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import render, get_object_or_404
 from django.utils.text import slugify
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_http_methods
 
 # Local imports
 from core.forms import ResultUploadForm 
@@ -160,18 +152,48 @@ def get_subject_performance_context(request):
     term_keys = [f"{t} ({y})" for t, y in term_sequence]
 
     teacher = request.user.teacher_profile
-    assigned_teachings = SubjectTeacher.objects.filter(teacher=teacher).select_related("subject").prefetch_related("assigned_classes")
-    assigned_subjects = {st.subject.name for st in assigned_teachings}
-    assigned_subject_ids = {st.subject.id for st in assigned_teachings}
-    assigned_classes = {cg.id for st in assigned_teachings for cg in st.assigned_classes.all()}
+    print(f"Teacher ID: {teacher.id}")
 
+    subject_teachings = SubjectTeacher.objects.filter(
+        teacher=teacher
+    ).select_related("subject").prefetch_related("assigned_classes__department", "subject__department")
+
+    assigned_classes = set()
+    assigned_subject_ids = set()
+    assigned_subjects = set()
+
+    for st in subject_teachings:
+        subject_departments = set(st.subject.department.all())
+        for class_group in st.assigned_classes.all():
+            print(f"Assigned class: {class_group.name}, Department: {class_group.department.name}")
+            if class_group.department in subject_departments:
+                assigned_classes.add(class_group.id)
+                assigned_subject_ids.add(st.subject.id)
+                assigned_subjects.add(st.subject.name)
+
+    # Debugging output: print the assigned subjects and classes
+    print("Assigned subjects:", assigned_subjects)
+    print("Assigned subject IDs:", assigned_subject_ids)
+    print("Assigned classes:", assigned_classes)
+
+    # Handle subject selection
     if selected_subject != "all":
-        subject_obj = Subject.objects.filter(name=selected_subject).first()
-        if subject_obj:
-            assigned_subjects, assigned_subject_ids = {selected_subject}, {subject_obj.id}
-        else:
-            assigned_subjects, assigned_subject_ids = set(), set()
+    # Confirm the selected subject is in the teacher's assignments
+        matched_subject_id = None
+        for st in subject_teachings:
+            if st.subject.name == selected_subject:
+                matched_subject_id = st.subject.id
+                break
 
+        if matched_subject_id:
+            assigned_subject_ids = {matched_subject_id}
+            assigned_subjects = {selected_subject}
+        else:
+            assigned_subject_ids = set()
+            assigned_subjects = set()
+
+
+    # Handle class selection
     if selected_class != "all":
         try:
             selected_class_id = int(selected_class)
@@ -180,6 +202,11 @@ def get_subject_performance_context(request):
         except ValueError:
             pass
 
+    # Debugging output for selected subject and class
+    print(f"Selected subject: {selected_subject}")
+    print("Selected subject ID:", assigned_subject_ids)
+    print(f"Selected class: {selected_class}")
+    
     if not assigned_subjects or not assigned_classes:
         return render(request, "teacher/subject_performance_analysis.html", {
             "student_rows": [], "class_average_row": {},
@@ -188,7 +215,7 @@ def get_subject_performance_context(request):
             "selected_year": academic_year, "selected_term": selected_term,
             "selected_subject": selected_subject, "selected_class": selected_class,
             "subjects": list(assigned_subjects), "assigned_classes": [],
-            "score_buckets": {}, "heatmap_data": [],
+            "score_buckets": {}, "heatmap_data": [], 
             "term_chart": {}, "year_chart": {},
         })
 
@@ -201,10 +228,13 @@ def get_subject_performance_context(request):
         student__school_id=teacher.school.id
     ).select_related("student", "subject").order_by("student__last_name")
 
+    print(f"Selected marks count: {selected_marks.count()}")
+
     student_rows = []
     class_scores = []
 
     for mark in selected_marks:
+        print(f"Mark: {mark.student.first_name} {mark.student.last_name}, Subject: {mark.subject.name}, Score: {mark.mark}")
         if mark.subject.name != selected_subject:
             continue
         student_name = f"{mark.student.last_name} {mark.student.first_name}"
@@ -227,6 +257,8 @@ def get_subject_performance_context(request):
         subject_id__in=assigned_subject_ids,
         student__school_id=teacher.school.id
     ).filter(q_terms).select_related("student", "subject")
+
+    print(f"Trend marks count: {trend_marks.count()}")
 
     term_aggregates = {key: [] for key in term_keys}
     year_aggregates = {year: [] for year in academic_years}
@@ -252,29 +284,42 @@ def get_subject_performance_context(request):
 
     # 🎯 Score Buckets
     score_buckets = {
-        "80-100": 0,
-        "55-79": 0,
+        "90-100": 0,
+        "80-89": 0,
+        "70-79": 0,
+        "60-69": 0,
+        "55-59": 0,
         "50-54": 0,
-        "40-49": 0,
+        "45-49": 0,
+        "40-44": 0,
         "0-39": 0
     }
 
     for mark in class_scores:
-        if mark >= 80:
-            score_buckets["80-100"] += 1
+        if mark >= 90:
+            score_buckets["90-100"] += 1
+        elif mark >= 80:
+            score_buckets["80-89"] += 1
+        elif mark >= 70:
+            score_buckets["70-79"] += 1
+        elif mark >= 60:
+            score_buckets["60-69"] += 1
         elif mark >= 55:
-            score_buckets["55-79"] += 1
+            score_buckets["55-59"] += 1
         elif mark >= 50:
             score_buckets["50-54"] += 1
+        elif mark >= 45:
+            score_buckets["45-49"] += 1
         elif mark >= 40:
-            score_buckets["40-49"] += 1
+            score_buckets["40-44"] += 1
         else:
             score_buckets["0-39"] += 1
+
 
     heatmap_data = [{"name": row["name"], "mark": float(row["mark"])} for row in student_rows]
 
     # 📈 Line Chart Labels & Data
-    term_labels = list(term_trend.keys())[1:]
+    term_labels = [" ".join(label.split(" ")[:2]) for label in list(term_trend.keys())[1:]]
     term_values = [float(val) if isinstance(val, (int, float, Decimal)) else None for val in list(term_trend.values())[1:]]
 
     year_labels = list(academic_trend.keys())[1:]
@@ -296,10 +341,14 @@ def get_subject_performance_context(request):
         "subjects": list(assigned_subjects),
         "assigned_classes": [{"id": cid, "name": class_groups[cid]} for cid in assigned_classes],
 
-        "bucket_80_100": score_buckets.get("80-100", 0),
-        "bucket_55_79": score_buckets.get("55-79", 0),
+        "bucket_90_100": score_buckets.get("90-100", 0),
+        "bucket_80_89": score_buckets.get("80-89", 0),
+        "bucket_70_79": score_buckets.get("70-79", 0),
+        "bucket_60_69": score_buckets.get("60-69", 0),
+        "bucket_55_59": score_buckets.get("55-59", 0),
         "bucket_50_54": score_buckets.get("50-54", 0),
-        "bucket_40_49": score_buckets.get("40-49", 0),
+        "bucket_45_49": score_buckets.get("45-49", 0),
+        "bucket_40_44": score_buckets.get("40-44", 0),
         "bucket_0_39": score_buckets.get("0-39", 0),
 
         "score_buckets": score_buckets,
@@ -307,6 +356,8 @@ def get_subject_performance_context(request):
         "term_chart": {"labels": term_labels, "data": term_values},
         "year_chart": {"labels": year_labels, "data": year_values},
     }
+
+
 
 
 @login_required
@@ -437,29 +488,20 @@ def download_subject_analysis_pdf(request):
 #------------------ CLASS TEACHER -----------------------
 
 def get_class_performance_context(request):
-    """Generates class performance analysis for a class teacher with academic year and term filters."""
-    print("🔍 Starting class performance context generation...")
-
     filter_options = json.loads(get_available_terms(request).content)
-    print("📋 Filter options fetched:", filter_options)
-
     academic_year = request.GET.get("academic_year", "").strip()
     selected_term = request.GET.get("term", "all")
-    print("📥 Raw GET academic_year:", academic_year, "| term:", selected_term)
 
     valid_years = [year["name"] for year in filter_options["academic_years"]]
     academic_year = academic_year if academic_year in valid_years else filter_options["selected_academic_year"]
-    print("✅ Valid academic_year selected:", academic_year)
 
     all_terms = [t["name"] for t in filter_options["terms"]]
     selected_term = selected_term if selected_term in all_terms else "Term 1"
-    print("✅ Valid selected_term:", selected_term)
 
     teacher = request.user.teacher_profile
     class_teacher = ClassTeacher.objects.filter(teacher=teacher).select_related("assigned_class").first()
 
     if not class_teacher:
-        print("❌ No class teacher assigned to this teacher.")
         return {
             "student_rows": [],
             "class_average_row": {},
@@ -478,7 +520,6 @@ def get_class_performance_context(request):
         }
 
     assigned_class = class_teacher.assigned_class
-    print("🏫 Assigned class:", assigned_class.name)
 
     selected_marks = StudentMark.objects.filter(
         class_group=assigned_class,
@@ -486,7 +527,6 @@ def get_class_performance_context(request):
         term=selected_term,
         student__school=teacher.school
     ).select_related("student", "subject").order_by("student__last_name")
-    print("🧾 Total marks fetched:", selected_marks.count())
 
     students = {}
     subjects = set()
@@ -497,9 +537,6 @@ def get_class_performance_context(request):
             students[student_key] = {"name": student_key, "marks": {}, "avg": 0}
         students[student_key]["marks"][mark.subject.name] = float(mark.mark)
         subjects.add(mark.subject.name)
-
-    print("👩‍🎓 Total unique students:", len(students))
-    print("📚 Subjects found:", sorted(subjects))
 
     subjects = sorted(subjects)
     subject_totals = {subject: [] for subject in subjects}
@@ -516,8 +553,6 @@ def get_class_performance_context(request):
         student_data["avg"] = round(sum(marks) / len(marks), 2) if marks else "-"
         student_rows.append(student_data)
 
-    print("🧮 Completed student row generation.")
-
     class_average_row = {"name": "Subject Average", "marks": {}}
     subject_avgs = []
     for subject in subjects:
@@ -527,7 +562,6 @@ def get_class_performance_context(request):
         if isinstance(avg, (int, float)):
             subject_avgs.append(avg)
     class_average_row["avg"] = round(sum(subject_avgs) / len(subject_avgs), 2) if subject_avgs else "-"
-    print("📊 Class subject averages:", class_average_row)
 
     base_year = int(academic_year.split("/")[0])
     prev_1 = f"{base_year - 1}/{base_year}"
@@ -550,7 +584,6 @@ def get_class_performance_context(request):
         class_group=assigned_class,
         student__school=teacher.school
     ).filter(q_terms).select_related("subject")
-    print("📈 Trend marks count:", trend_marks.count())
 
     term_aggregates = {key: [] for key in term_keys}
     year_aggregates = {year: [] for year in academic_years}
@@ -571,10 +604,7 @@ def get_class_performance_context(request):
         **{year: round(sum(v) / len(v), 2) if v else "-" for year, v in year_aggregates.items()}
     }
 
-    print("📉 Term trend:", term_trend)
-    print("📅 Academic trend:", academic_trend)
-
-    term_labels = list(term_trend.keys())[1:]
+    term_labels = [" ".join(label.split(" ")[:2]) for label in list(term_trend.keys())[1:]]
     term_values = [float(val) if isinstance(val, (int, float)) else None for val in list(term_trend.values())[1:]]
 
     year_labels = list(academic_trend.keys())[1:]
@@ -582,18 +612,19 @@ def get_class_performance_context(request):
 
     all_scores = [score for sublist in subject_totals.values() for score in sublist]
     score_buckets = {
-        "80-100": sum(1 for s in all_scores if s >= 80),
-        "55-79": sum(1 for s in all_scores if 55 <= s < 80),
-        "50-54": sum(1 for s in all_scores if 50 <= s < 55),
-        "40-49": sum(1 for s in all_scores if 40 <= s < 50),
-        "0-39":  sum(1 for s in all_scores if s < 40),
+        "90-100": sum(1 for s in all_scores if s >= 90),
+        "80-89":  sum(1 for s in all_scores if 80 <= s < 90),
+        "70-79":  sum(1 for s in all_scores if 70 <= s < 80),
+        "60-69":  sum(1 for s in all_scores if 60 <= s < 70),
+        "55-59":  sum(1 for s in all_scores if 55 <= s < 60),
+        "50-54":  sum(1 for s in all_scores if 50 <= s < 55),
+        "45-49":  sum(1 for s in all_scores if 45 <= s < 50),
+        "40-44":  sum(1 for s in all_scores if 40 <= s < 45),
+        "0-39":   sum(1 for s in all_scores if s < 40),
     }
-    print("🎯 Score buckets:", score_buckets)
 
     heatmap_data = [{"name": row["name"], "mark": float(row["avg"])} for row in student_rows if isinstance(row["avg"], (int, float))]
-    print("🔥 Heatmap data generated. Total:", len(heatmap_data))
 
-    print("✅ Finished generating context.")
     return {
         "student_rows": student_rows,
         "class_average_row": class_average_row,
@@ -606,17 +637,23 @@ def get_class_performance_context(request):
         "subjects": subjects,
         "assigned_classes": [{"id": assigned_class.id, "name": assigned_class.name}],
 
-        "bucket_80_100": score_buckets["80-100"],
-        "bucket_55_79": score_buckets["55-79"],
-        "bucket_50_54": score_buckets["50-54"],
-        "bucket_40_49": score_buckets["40-49"],
-        "bucket_0_39": score_buckets["0-39"],
+        # For ChartJS
+        "bucket_90_100": score_buckets["90-100"],
+        "bucket_80_89":  score_buckets["80-89"],
+        "bucket_70_79":  score_buckets["70-79"],
+        "bucket_60_69":  score_buckets["60-69"],
+        "bucket_55_59":  score_buckets["55-59"],
+        "bucket_50_54":  score_buckets["50-54"],
+        "bucket_45_49":  score_buckets["45-49"],
+        "bucket_40_44":  score_buckets["40-44"],
+        "bucket_0_39":   score_buckets["0-39"],
 
         "score_buckets": score_buckets,
         "heatmap_data": heatmap_data,
         "term_chart": {"labels": term_labels, "data": term_values},
         "year_chart": {"labels": year_labels, "data": year_values},
     }
+
 
 @login_required
 def class_performance_analysis(request):
@@ -702,10 +739,14 @@ def download_class_performance_pdf(request):
     elements.append(Paragraph("Score Distribution Buckets", subtitle_style))
     bucket_table_data = [
         ["Score Range", "Number of Students"],
-        ["80-100", score_buckets["80-100"]],
-        ["55-79", score_buckets["55-79"]],
+        ["90-100", score_buckets["90-100"]],
+        ["80-89", score_buckets["80-89"]],
+        ["70-79", score_buckets["70-79"]],
+        ["60-69", score_buckets["60-69"]],
+        ["55-59", score_buckets["55-59"]],
         ["50-54", score_buckets["50-54"]],
-        ["40-49", score_buckets["40-49"]],
+        ["45-49", score_buckets["45-49"]],
+        ["40-44", score_buckets["40-44"]],
         ["0-39", score_buckets["0-39"]],
     ]
     bucket_table = Table(bucket_table_data, colWidths=[120, 120])
@@ -724,13 +765,18 @@ def download_class_performance_pdf(request):
     bar.height = 120
     bar.width = 300
     bar.data = [[
-        score_buckets["80-100"],
-        score_buckets["55-79"],
+        score_buckets["90-100"],
+        score_buckets["80-89"],
+        score_buckets["70-79"],
+        score_buckets["60-69"],
+        score_buckets["55-59"],
         score_buckets["50-54"],
-        score_buckets["40-49"],
+        score_buckets["45-49"],
+        score_buckets["40-44"],
         score_buckets["0-39"],
     ]]
-    bar.categoryAxis.categoryNames = ["80-100", "55-79", "50-54", "40-49", "0-39"]
+    
+    bar.categoryAxis.categoryNames = ['90-100', '80-89', '70-79', '60-69', '55-59', '50-54', '45-49', '40-44', '0-39']
     bar.barWidth = 15
     bar.strokeColor = colors.black
     bar.valueAxis.valueMin = 0
@@ -825,7 +871,7 @@ def can_teacher_upload_result(teacher, class_group, subject):
 
 @login_required
 def manual_upload_result(request):
-    """Manually uploads a single result entry."""
+    """Manually uploads a single result entry with detailed CA and Exam breakdown."""
     if request.method != "POST":
         return JsonResponse({"error": "Invalid request method"}, status=405)
 
@@ -836,54 +882,78 @@ def manual_upload_result(request):
     subject = form.cleaned_data["subject"]
     class_group = form.cleaned_data["class_group"]
     student_name = form.cleaned_data["student_name"]
-    mark = form.cleaned_data["mark"]
     academic_year = form.cleaned_data["academic_year"]
     term = form.cleaned_data["term"]
 
+    # Breakdown fields
+    cat1 = form.cleaned_data.get("cat1", 0)
+    project_work = form.cleaned_data.get("project_work", 0)
+    cat2 = form.cleaned_data.get("cat2", 0)
+    group_work = form.cleaned_data.get("group_work", 0)
+    exam_score = form.cleaned_data.get("exam_score", 0)
+
     teacher = request.user.teacher_profile
 
-    # Shared permission logic
+    # 🔒 Permission check
     if not can_teacher_upload_result(teacher, class_group, subject):
         return JsonResponse({"error": "Unauthorized: You are not allowed to upload results for this subject."}, status=403)
 
-    
+    # Split student name
     name_parts = student_name.split(maxsplit=1)
     first_name = name_parts[0]
     last_name = name_parts[1] if len(name_parts) > 1 else ""
 
-    
+    # Get or create student
     student, created = Student.objects.get_or_create(
         first_name=first_name,
         last_name=last_name,
-        school=request.user.school,  # Ensure student gets the teacher's school
+        school=request.user.school,
         defaults={
             "class_group": class_group,
-            "circuit": request.user.circuit,  
-            "district": request.user.district  
+            "circuit": request.user.circuit,
+            "district": request.user.district
         }
     )
 
-    
+    # Update class group if changed
     if not created and student.class_group != class_group:
         student.class_group = class_group
         student.save()
 
-    
+    # 🧮 Compute derived values
+    try:
+        total_ca = float(cat1) + float(project_work) + float(cat2) + float(group_work)
+        ca_50 = round((total_ca / 100) * 50, 2)
+        exam_50 = round((float(exam_score) / 100) * 50, 2)
+        final_mark = round(ca_50 + exam_50, 2)
+    except Exception:
+        return JsonResponse({"error": "Invalid numerical inputs in assessment breakdown."}, status=400)
+
+    # Save result
     Result.objects.create(
         academic_year=academic_year,
         class_group=class_group,
         subject=subject,
         term=term,
         student=student,
-        mark=mark,
         teacher=request.user,
         school=request.user.school,
-        circuit=request.user.circuit, 
-        district=request.user.district,  
-        status="Pending"
+        circuit=request.user.circuit,
+        district=request.user.district,
+        status="Pending",
+        cat1=cat1,
+        project_work=project_work,
+        cat2=cat2,
+        group_work=group_work,
+        total_ca=total_ca,
+        ca_50=ca_50,
+        exam_score=exam_score,
+        exam_50=exam_50,
+        final_mark=final_mark
     )
 
     return JsonResponse({"message": "Result uploaded successfully!"}, status=201)
+
 
 
 
@@ -931,9 +1001,24 @@ def bulk_upload_results(request):
         subject_name = str(row.get("Subject") or "").strip()
         academic_year = str(row.get("Academic Year") or "").strip()
         term = str(row.get("Term") or "").strip()
-        mark = row.get("Mark") or ""
 
-        if not all([student_name, class_name, subject_name, academic_year, term, mark]):
+        # New fields
+        try:
+            cat1 = float(row.get("CAT1", 0))
+            project_work = float(row.get("Project Work", 0))
+            cat2 = float(row.get("CAT2", 0))
+            group_work = float(row.get("Group Work", 0))
+            exam_score = float(row.get("Exam Score", 0))
+        except ValueError:
+            errors.append({"row": index + 1, "error": "Scores must be numeric."})
+            continue
+
+        total_ca = cat1 + project_work + cat2 + group_work
+        ca_50 = round(total_ca * 0.5, 2)
+        exam_50 = round(exam_score * 0.5, 2)
+        final_mark = round(ca_50 + exam_50, 2)
+
+        if not all([student_name, class_name, subject_name, academic_year, term]):
             errors.append({"row": index + 1, "error": "Missing required fields."})
             continue
 
@@ -945,10 +1030,9 @@ def bulk_upload_results(request):
             errors.append({"row": index + 1, "error": f"Invalid term: {term}"})
             continue
 
-        # ✅ Fix: Ensure class group belongs to the teacher's school
         class_group_queryset = ClassGroup.objects.select_related("department").filter(
             name=class_name,
-            school=teacher_school  # Ensure the class is in the teacher's school
+            school=teacher_school
         )
 
         if class_group_queryset.count() == 1:
@@ -973,13 +1057,8 @@ def bulk_upload_results(request):
             })
             continue
 
-        # Validate mark
-        try:
-            mark = float(mark)
-            if not (0 <= mark <= 100):
-                raise ValueError
-        except ValueError:
-            errors.append({"row": index + 1, "error": "Mark must be a number between 0 and 100."})
+        if not (0 <= final_mark <= 100):
+            errors.append({"row": index + 1, "error": "Final mark must be between 0 and 100."})
             continue
 
         student_key = student_name
@@ -1009,7 +1088,15 @@ def bulk_upload_results(request):
                 subject=subject,
                 term=term,
                 student=student,
-                mark=mark,
+                cat1=cat1,
+                project_work=project_work,
+                cat2=cat2,
+                group_work=group_work,
+                total_ca=total_ca,
+                ca_50=ca_50,
+                exam_score=exam_score,
+                exam_50=exam_50,
+                final_mark=final_mark,
                 teacher=request.user,
                 school=teacher_school,
                 circuit=teacher_circuit,
@@ -1028,7 +1115,7 @@ def bulk_upload_results(request):
                 academic_year=result.academic_year,
                 term=result.term,
                 class_group=result.class_group,
-                defaults={"mark": result.mark}
+                defaults={"mark": result.final_mark}
             )
 
     return JsonResponse({
@@ -1040,7 +1127,7 @@ TERM_MAPPING = {"1": "Term 1", "2": "Term 2", "3": "Term 3"}
 
 @login_required
 def download_result_template(request):
-    """Generates a dynamic CSV or Excel template for bulk result uploads."""
+    """Generates a dynamic CSV or Excel template for bulk result uploads with assessment breakdown."""
     file_format = request.GET.get("file_format", "csv")
     class_id = request.GET.get("class")
     subject_id = request.GET.get("subject")
@@ -1086,9 +1173,14 @@ def download_result_template(request):
     class_name = class_group.name
     subject_name = subject.name
 
-    headers = ["First Name", "Last Name", "Class", "Subject", "Academic Year", "Term", "Mark"]
+    # Updated headers with breakdown columns
+    headers = [
+        "First Name", "Last Name", "Class", "Subject", "Academic Year", "Term",
+        "CAT1", "Project Work", "CAT2", "Group Work", "Exam Score"
+    ]
+
     template_data = [
-        ["", "", class_name, subject_name, formatted_academic_year, term, ""]
+        ["", "", class_name, subject_name, formatted_academic_year, term, "", "", "", "", ""]
         for _ in range(student_count)
     ]
 
@@ -1114,6 +1206,7 @@ def download_result_template(request):
         return response
 
     return JsonResponse({"error": "Invalid file format"}, status=400)
+
 
 
 #------------------ RESULT MANAGEMENT -------------------
@@ -1161,7 +1254,6 @@ def view_uploaded_files(request):
 @login_required
 def view_result_entries(request, year, term, subject_id, class_id):
     teacher = request.user
-
     year = str(year).replace('-', '/')
     term = term.replace('-', ' ').title()
 
@@ -1185,13 +1277,54 @@ def view_result_entries(request, year, term, subject_id, class_id):
     subject = results[0].subject
     class_group = results[0].class_group
 
+    # Sort results by final_mark for ranking
+    ranked_results = sorted(results, key=lambda r: r.final_mark or 0, reverse=True)
+
+    entries = []
+    for index, result in enumerate(ranked_results):
+        mark = result.final_mark or 0
+
+        if 90 <= mark <= 100:
+            remark = "Distinction"
+        elif 80 <= mark <= 89:
+            remark = "Excellent"
+        elif 70 <= mark <= 79:
+            remark = "Very Good"
+        elif 60 <= mark <= 69:
+            remark = "Good"
+        elif 55 <= mark <= 59:
+            remark = "Credit"
+        elif 50 <= mark <= 54:
+            remark = "Pass"
+        elif 45 <= mark <= 49:
+            remark = "Weak Pass"
+        elif 40 <= mark <= 44:
+            remark = "Unsatisfactory"
+        else:
+            remark = "Fail"
+
+        entries.append({
+            "result": result,
+            "total_ca": result.total_ca,
+            "ca_50": result.ca_50,
+            "exam_50": result.exam_50,
+            "final_mark": result.final_mark,
+            "position": index + 1,
+            "remark": remark
+        })
+
+    read_only = results.first().status == "Submitted"
+
     return render(request, "teacher/view_result.html", {
-        "results": results,
+        "results": entries,
         "subject": subject,
         "class_group": class_group,
         "year": year,
-        "term": term
+        "term": term,
+        "read_only": read_only
     })
+
+
 
 
 @require_http_methods(["DELETE"])

@@ -6,9 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher Management</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="icon" type="image/png" href="{% static 'edu favicon.png' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
         body {
+            overflow: auto;
             font-family: 'Calibri', sans-serif;
             margin: 0;
             background-color: #e0f7fa;
@@ -68,6 +70,12 @@
             gap: 8px;
         }
 
+        .btn-group {
+            display: flex;
+            gap: 10px; /* Adjust spacing between buttons */
+        }
+
+
         .alert {
             position: fixed;
             top: 20px;
@@ -107,7 +115,18 @@
             gap: 20px;
             flex-wrap: wrap;
         }
+        @media (max-width: 768px) {
+            .logo-img {
+                max-width: 100px;
+                
+            }
+        }
 
+        @media (max-width: 480px) {
+            .logo-img {
+                max-width: 80px;   
+            }
+        }
     </style>
 </head>
 <body>
@@ -123,10 +142,12 @@
     <main class="container mt-4">
         <div id="notification" class="alert d-none" role="alert"></div>
 
-        <div class="text-center mb-3">
-            <button id="manualUploadButton" class="btn btn-primary btn-custom">📄 Manual Upload</button>
-            <button id="bulkUploadButton" class="btn btn-secondary btn-custom">📂 Bulk Upload</button>
-            <button id="downloadTemplateButton" class="btn btn-success btn-custom">⬇️ Download Template</button>
+        <div class="d-flex justify-content-center mb-4">
+            <div class="btn-group">
+                <button id="manualUploadButton" class="btn btn-primary active">📄 Manual Upload</button>
+                <button id="bulkUploadButton" class="btn btn-secondary">📂 Bulk Upload</button>
+                <button id="downloadTemplateButton" class="btn btn-success">⬇️ Download Template</button>
+            </div>
         </div>
         
         <div id="templateContainer" class="template-container">

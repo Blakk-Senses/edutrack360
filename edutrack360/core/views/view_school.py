@@ -1,56 +1,51 @@
-from django.contrib.auth import get_user_model
-from django.http import HttpResponse
-from django.db.models import Count, Avg, F, Q, Max
-from django.contrib.auth.hashers import make_password
-from django.http import JsonResponse, HttpResponse
-from core.models import (
-    Department, Subject, Result, Teacher,  
-    ClassTeacher, SubjectTeacher, ClassGroup, StudentMark,
-    Notification, 
-)
+# --- Standard Library ---
+import os
 import io
+import csv
+import json
+import logging
 from collections import defaultdict
-from django.http import HttpResponse
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
-)
-from reportlab.graphics.shapes import Drawing, String
-from reportlab.graphics.charts.barcharts import VerticalBarChart
+
+# --- Django Core ---
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import Count, F, Q, Max
+from django.utils import timezone
+from django.utils.text import slugify
+from django.core.files.storage import default_storage
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required, user_passes_test
+
+# --- Third-party Libraries ---
+import pandas as pd
+from openpyxl import Workbook
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from reportlab.platypus import Image
-from openpyxl import Workbook
-from openpyxl.worksheet.datavalidation import DataValidation
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
-from core.forms import TeacherRegistrationForm
-from django.contrib import messages
-import pandas as pd
-from django.core.files.storage import default_storage
-import csv
-from django.views.decorators.csrf import csrf_exempt
-import json
-from io import BytesIO
-import os
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.core.paginator import Paginator
-from django.utils.text import slugify
-from django.views.decorators.http import require_POST
-from django.utils import timezone
-from django.conf import settings
-import logging
-from django.core.validators import validate_email
-from django.core.exceptions import ValidationError
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer, Image
+)
+
+# --- Django Channels ---
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+
+# --- Internal Imports ---
+from core.models import (
+    Department, Subject, Result, Teacher, ClassTeacher, SubjectTeacher,
+    ClassGroup, StudentMark, Notification
+)
+from core.forms import TeacherRegistrationForm
+
 
 logger = logging.getLogger(__name__)
 
@@ -295,7 +290,7 @@ def assign_teacher_to_class(request):
         # 🎯 Validate teacher, department, and class
         teacher = get_object_or_404(Teacher, id=teacher_id, school=user_school)
         department = get_object_or_404(Department, id=department_id, schools=user_school)
-        class_obj = get_object_or_404(ClassGroup, id=class_id, department=department)
+        class_obj = get_object_or_404(ClassGroup, id=class_id, department=department, school=user_school)
 
         # 🚨 Prevent assigning a class if the teacher is already a subject teacher
         if teacher.assigned_subjects.exists():
@@ -307,7 +302,6 @@ def assign_teacher_to_class(request):
         return JsonResponse({"message": "Teacher assigned successfully!"})
 
     return JsonResponse({"error": "Invalid request method"}, status=400)
-
 
 
 
@@ -325,22 +319,20 @@ def remove_teacher_from_class(request):
         # Ensure both teacher and class exist in the same school
         teacher = get_object_or_404(Teacher, id=teacher_id, school=user_school)
 
-        # Fetch the department using the class_id and ensure it belongs to the user's school
-        department = get_object_or_404(Department, schools=user_school, id=class_id)
+        # Fetch the department and class, both tied to school
+        class_obj = get_object_or_404(ClassGroup, id=class_id, department__schools=user_school)
 
-        # Fetch the ClassGroup based on the department and ensure it's in the same school
-        class_obj = get_object_or_404(ClassGroup, id=class_id, department=department)
-
-        # Remove teacher-class association completely
-        deleted_count, _ = ClassTeacher.objects.filter(teacher=teacher, assigned_class=class_obj).delete()
+        # Remove teacher-class association
+        deleted_count, _ = ClassTeacher.objects.filter(
+            teacher=teacher, assigned_class=class_obj
+        ).delete()
 
         if deleted_count > 0:
             return JsonResponse({"message": "Teacher removed successfully!"})
         return JsonResponse({"error": "Teacher was not assigned to this class"}, status=400)
 
-    # If GET request is still necessary, return a JSON response for teacher data (optional)
+    # GET fallback — return available teachers for selection
     teachers = Teacher.objects.filter(school=user_school)
-    
     return JsonResponse({
         "teachers": list(teachers.values("id", "user__first_name", "user__last_name"))
     })
@@ -1010,19 +1002,59 @@ def headteacher_view_result(request, year, term, subject_id, class_id):
         term=term,
         subject_id=subject_id,
         class_group_id=class_id,
-        school=school  # Add filtering by school
+        school=school
     ).select_related("student", "subject", "class_group")
 
     if not results.exists():
         return render(request, "school/view_result.html", {
-            "results": [], "subject": None, "class_group": None, "year": year, "term": term
+            "results": [],
+            "subject": None,
+            "class_group": None,
+            "year": year,
+            "term": term
         })
 
     subject = results[0].subject
     class_group = results[0].class_group
 
+    # Sort results by final_mark for ranking
+    ranked_results = sorted(results, key=lambda r: r.final_mark or 0, reverse=True)
+
+    entries = []
+    for index, result in enumerate(ranked_results):
+        mark = result.final_mark or 0
+
+        if 90 <= mark <= 100:
+            remark = "Distinction"
+        elif 80 <= mark <= 89:
+            remark = "Excellent"
+        elif 70 <= mark <= 79:
+            remark = "Very Good"
+        elif 60 <= mark <= 69:
+            remark = "Good"
+        elif 55 <= mark <= 59:
+            remark = "Credit"
+        elif 50 <= mark <= 54:
+            remark = "Pass"
+        elif 45 <= mark <= 49:
+            remark = "Weak Pass"
+        elif 40 <= mark <= 44:
+            remark = "Unsatisfactory"
+        else:
+            remark = "Fail"
+
+        entries.append({
+            "result": result,
+            "total_ca": result.total_ca,
+            "ca_50": result.ca_50,
+            "exam_50": result.exam_50,
+            "final_mark": result.final_mark,
+            "position": index + 1,
+            "remark": remark
+        })
+
     return render(request, "school/view_result.html", {
-        "results": results,
+        "results": entries,
         "subject": subject,
         "class_group": class_group,
         "year": year,

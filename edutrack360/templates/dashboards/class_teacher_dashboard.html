@@ -7,8 +7,40 @@
     <title>Class Teacher Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="{% static 'css/class_teacher_dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <link rel="icon" type="image/png" href="{% static 'edu favicon.png' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        /* Assigning both border and text color */
+        .total-students-assessed {
+            border-left-color: #22027c; /* Green */
+            color: #22027c;
+        }
+
+        .average-class-performance {
+            border-left-color: #17A2B8; /* Cyan */
+            color: #17A2B8;
+        }
+
+        .best-performing-students {
+            border-left-color: #28A745; /* Green */
+            color: #28A745;
+        }
+
+        .weakest-performing-students {
+            border-left-color: #DC3545; /* Red */
+            color: #DC3545;
+        }
+
+        .top-performing-subject {
+            border-left-color: #6002b7; /* Purple */
+            color: #6002b7;
+        }
+        .bottom-performing-subject {
+            border-left-color: #d96003; /* Purple */
+            color: #d96003;
+        }
+    </style>
 </head>
 <body>
     <div class="navbar">
@@ -53,6 +85,12 @@
     </div>
     <div class="main-content">
         <div class="container mt-4">
+            {% if deadline_status %}
+            <div class="alert alert-{{ deadline_status.status }} alert-dismissible fade show" role="alert" id="deadlineAlert">
+                <strong class="fs-5">{{ deadline_status.message }}</strong> 
+                <p class="fs-6">Deadline: {{ deadline_status.deadline_date }}</p>
+            </div>
+            {% endif %}
             <!-- Filters -->
             <div class="row g-3 mb-4 align-items-end">
                 <div class="col-md-6">
@@ -149,15 +187,6 @@
                         </div>
                     </div>
                 </div>
-                <!-- Upcoming Deadlines & Reminders -->
-                <div class="col-md-12">
-                    <div class="custom-card">
-                        <div class="card-header">Upcoming Deadlines & Reminders</div>
-                        <div class="card-body">
-                            <p>No upcoming deadlines.</p>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
         <!-- Logout Confirmation Modal -->
@@ -178,126 +207,162 @@
                 </div>
             </div>
         </div>
-    
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-        <!-- JS -->
-        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script>
-            function formatPercent(value) {
-                return value !== null && !isNaN(value) ? parseFloat(value).toFixed(2) + "%" : "N/A";
-            }
-        
-            function fetchClassTeacherDashboardData() {
-                const academic_year = $("#yearFilter").val();
-                const term = $("#termFilter").val();
-        
-                $.ajax({
-                    url: "{% url 'dashboards:class_teacher_dashboard' %}",
-                    data: { academic_year, term },
-                    headers: { "X-Requested-With": "XMLHttpRequest" },
-                    success: function (data) {
-                        $(".total-students-assessed .value").text(data.total_students_assessed || 0);
-                        $(".average-class-performance .value").text(formatPercent(data.average_class_performance));
-        
-                        // Best Students
-                        let bestHtml = data.best_students.length
-                            ? data.best_students.map(s => `<li>${s.name} (${formatPercent(s.mark)})</li>`).join("")
-                            : "<li>No data available</li>";
-                        $(".best-performing-students .value").html(bestHtml);
-        
-                        // Weakest Students
-                        let weakHtml = data.weakest_students.length
-                            ? data.weakest_students.map(s => `<li>${s.name} (${formatPercent(s.mark)})</li>`).join("")
-                            : "<li>No data available</li>";
-                        $(".weakest-performing-students .value").html(weakHtml);
-        
-                        // Top Subject
-                        if (data.top_performing_subject) {
-                            $(".top-performing-subject .value").text(`${data.top_performing_subject.subject__name} (${formatPercent(data.top_performing_subject.avg_mark)})`);
-                        } else {
-                            $(".top-performing-subject .value").text("N/A");
-                        }
-        
-                        // Bottom Subject
-                        if (data.bottom_performing_subject) {
-                            $(".bottom-performing-subject .value").text(`${data.bottom_performing_subject.subject__name} (${formatPercent(data.bottom_performing_subject.avg_mark)})`);
-                        } else {
-                            $(".bottom-performing-subject .value").text("N/A");
-                        }
-        
-                        updateTrendChart(data.performance_trends);
+    <!-- JS -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        function formatPercent(value) {
+            return value !== null && !isNaN(value) ? parseFloat(value).toFixed(2) + "%" : "N/A";
+        }
+    
+        function fetchClassTeacherDashboardData() {
+            const academic_year = $("#yearFilter").val();
+            const term = $("#termFilter").val();
+    
+            $.ajax({
+                url: "{% url 'dashboards:class_teacher_dashboard' %}",
+                data: { academic_year, term },
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                success: function (data) {
+                    $(".total-students-assessed .value").text(data.total_students_assessed || 0);
+                    $(".average-class-performance .value").text(formatPercent(data.average_class_performance));
+    
+                    // Best Students
+                    let bestHtml = data.best_students.length
+                        ? data.best_students.map(s => `<li>${s.name} (${formatPercent(s.mark)})</li>`).join("")
+                        : "<li>No data available</li>";
+                    $(".best-performing-students .value").html(bestHtml);
+    
+                    // Weakest Students
+                    let weakHtml = data.weakest_students.length
+                        ? data.weakest_students.map(s => `<li>${s.name} (${formatPercent(s.mark)})</li>`).join("")
+                        : "<li>No data available</li>";
+                    $(".weakest-performing-students .value").html(weakHtml);
+    
+                    // Top Subject
+                    if (data.top_performing_subject) {
+                        $(".top-performing-subject .value").text(`${data.top_performing_subject.subject__name} (${formatPercent(data.top_performing_subject.avg_mark)})`);
+                    } else {
+                        $(".top-performing-subject .value").text("N/A");
                     }
-                });
-            }
-        
-            // Chart
-            const ctx = document.getElementById("performanceTrendsChart").getContext("2d");
-            const trendChart = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: "Average Score by Subject",
-                        data: [],
-                        borderColor: "blue",
-                        backgroundColor: "rgba(0, 0, 255, 0.1)",
-                        tension: 0.3,
-                        fill: true,
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            title: {
-                                display: true,
-                                text: 'Average Score (%)'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Subjects'
-                            }
+    
+                    // Bottom Subject
+                    if (data.bottom_performing_subject) {
+                        $(".bottom-performing-subject .value").text(`${data.bottom_performing_subject.subject__name} (${formatPercent(data.bottom_performing_subject.avg_mark)})`);
+                    } else {
+                        $(".bottom-performing-subject .value").text("N/A");
+                    }
+    
+                    updateTrendChart(data.performance_trends);
+                }
+            });
+        }
+    
+        // Chart
+        const ctx = document.getElementById("performanceTrendsChart").getContext("2d");
+        const trendChart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: [],
+                datasets: [{
+                    label: "Average Score by Subject",
+                    data: [],
+                    borderColor: "blue",
+                    backgroundColor: "rgba(0, 0, 255, 0.1)",
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Average Score (%)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Subjects'
                         }
                     }
                 }
-            });
-        
-            function updateTrendChart(trendData) {
-                const labels = trendData.map(e => e.subject__name || e.subject);
-                const scores = trendData.map(e => e.avg_mark);
-                trendChart.data.labels = labels;
-                trendChart.data.datasets[0].data = scores;
-                trendChart.update();
             }
-        
-            $("#yearFilter, #termFilter").on("change", fetchClassTeacherDashboardData);
-            $(document).ready(fetchClassTeacherDashboardData);
+        });
+    
+        function updateTrendChart(trendData) {
+            const labels = trendData.map(e => e.subject__name || e.subject);
+            const scores = trendData.map(e => e.avg_mark);
+            trendChart.data.labels = labels;
+            trendChart.data.datasets[0].data = scores;
+            trendChart.update();
+        }
+    
+        $("#yearFilter, #termFilter").on("change", fetchClassTeacherDashboardData);
+        $(document).ready(fetchClassTeacherDashboardData);
 
-            document.addEventListener("DOMContentLoaded", function () {
-                const logoutBtn = document.getElementById("logoutBtn");
-                const confirmLogout = document.getElementById("confirmLogout");
-                const logoutUrl = logoutBtn.getAttribute("data-logout-url");
+        document.addEventListener("DOMContentLoaded", function () {
+            const logoutBtn = document.getElementById("logoutBtn");
+            const confirmLogout = document.getElementById("confirmLogout");
+            const logoutUrl = logoutBtn.getAttribute("data-logout-url");
 
-                const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
+            const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
 
-                logoutBtn.addEventListener("click", function (e) {
-                    e.preventDefault();
-                    logoutModal.show();
-                });
-
-                confirmLogout.addEventListener("click", function () {
-                    window.location.href = logoutUrl;
-                });
+            logoutBtn.addEventListener("click", function (e) {
+                e.preventDefault();
+                logoutModal.show();
             });
-        </script>
-        
+
+            confirmLogout.addEventListener("click", function () {
+                window.location.href = logoutUrl;
+            });
+        });
+
+        const alertElement = document.getElementById("deadlineAlert");
+
+        if (alertElement) {
+            let flashInterval;
+
+            // Function to toggle alert visibility for flashing effect
+            function flashAlert() {
+                alertElement.classList.toggle("flashing");  // Flashing effect
+            }
+
+            // Start flashing if the deadline is within 14 days
+            const currentDate = new Date();
+            const deadlineDate = new Date("{{ deadline_status.deadline_date }}");
+            const timeRemaining = deadlineDate - currentDate;
+
+            if (timeRemaining <= 14 * 24 * 60 * 60 * 1000 && timeRemaining > 0) {  // Deadline is within 14 days
+                flashInterval = setInterval(flashAlert, 1000);  // Flash every 1 second
+            }
+
+            // Make sure the alert is shown initially
+            alertElement.classList.add("show");  // Ensure the alert is shown
+
+            // Auto hide the alert after the deadline has passed
+            if (currentDate >= deadlineDate) {
+                setTimeout(function () {
+                    alertElement.classList.add("custom-fade-out");
+                }, 20000);
+            }
+
+
+            // Clean up flashing when the alert is manually dismissed or hidden
+            alertElement.addEventListener("close", function() {
+                clearInterval(flashInterval); // Stop flashing
+            });
+        }
+
+    </script>
 </body>
 </html>

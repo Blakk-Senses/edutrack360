@@ -39,7 +39,7 @@ def create_or_update_student_mark(sender, instance, created, **kwargs):
             academic_year=instance.academic_year,
             term=instance.term,
             class_group=instance.class_group,
-            defaults={"mark": instance.mark}
+            defaults={"mark": instance.final_mark}
         )
 
         print(f"{'Created' if created else 'Updated'} StudentMark for {instance.student} - {instance.subject}")
@@ -48,9 +48,10 @@ def create_or_update_student_mark(sender, instance, created, **kwargs):
 @receiver(post_save, sender=Result)
 def create_notification_for_result_upload(sender, instance, created, **kwargs):
     """Creates a notification when a teacher uploads results."""
-    if created:  # Only trigger on new result uploads
+    if created:
         Notification.objects.create(
-            recipient=instance.school.headteacher,  # Assuming school has a headteacher field
-            sender=instance.teacher.user,  # Assuming teacher is linked to a user
+            recipient=instance.school.headteacher,
+            sender=instance.teacher,
             message=f"{instance.teacher.first_name} {instance.teacher.last_name} uploaded {instance.subject.name} results for {instance.class_group.name}."
         )
+

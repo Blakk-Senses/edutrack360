@@ -1,0 +1,299 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Management</title>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <link rel="icon" type="image/png" href="{% static 'edu favicon.png' %}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Calibri', sans-serif;
+            margin: 0;
+            background-color: #e0f7fa;
+            padding-top: 50px; /* Ensures content doesn't overlap with navbar */
+        }
+
+        .navbar {
+            background-color: #003a3b;
+            color: white;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            padding: 10px 20px;
+        }
+
+        .logo-img {
+            max-width: 120px;
+            height: auto;
+        }
+
+        .container {
+            margin-left: 100px;
+            margin-top: 60px;
+            padding: 20px;
+        }
+
+        .nav-pills .nav-link.active {
+            color: white !important;
+        }
+        @media (max-width: 768px) {
+            .nav-pills .nav-link {
+                font-size: 14px;
+                padding: 6px 10px;
+                margin: 0 4px;
+            }
+
+            .nav-pills .nav-link i {
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin-left: 0px;
+            }
+            .nav-pills .nav-link {
+                font-size: 12px;
+                padding: 4px 8px;
+                margin: 0 2px;
+            }
+
+            .nav-pills .nav-link i {
+                font-size: 12px;
+            }
+        }
+        @media (max-width: 768px) {
+            .tab-content .tab-pane {
+                padding: 15px;
+            }
+
+            .tab-content h4 {
+                font-size: 18px;
+            }
+
+            .form-control {
+                font-size: 14px;
+                padding: 8px 10px;
+            }
+
+            .btn {
+                font-size: 14px;
+                padding: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .tab-content .tab-pane {
+                padding: 10px;
+            }
+
+            .tab-content h4 {
+                font-size: 16px;
+            }
+
+            .form-control {
+                font-size: 13px;
+                padding: 6px 8px;
+            }
+
+            .btn {
+                font-size: 13px;
+                padding: 8px;
+            }
+        }
+        @media (max-width: 768px) {
+            .logo-img {
+                max-width: 80px;
+                
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo-img {
+                max-width: 80px;
+                
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="logo">
+        <a href="{% url 'dashboards:cis_registration' %}">
+            <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
+        </a>
+        </div>
+        <div class="navbar-icons">
+            <div class="notification-wrapper position-relative" style="cursor: pointer;" id="notificationBell">
+                <i class="fa fa-bell fs-4"></i>
+                <span id="notificationDot" class="position-absolute top-0 start-100 translate-middle badge rounded-circle bg-danger d-none" style="width: 10px; height: 10px; padding: 0;"></span>
+            </div>
+            
+            <!-- User Icon with Dropdown -->
+            <div class="user-dropdown-wrapper position-relative" style="display: inline-block;">
+                <i class="fas fa-user-circle" id="userIcon" style="cursor: pointer;"></i>
+                
+                <!-- Dropdown -->
+                <div id="userDropdown" class="user-dropdown position-absolute end-0 mt-2 d-none">
+                    <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span class="tooltip">Logout</span>
+                    </a>
+                </div>
+            </div>
+            
+            <span class="welcome-text">Welcome, Admin</span>
+            
+        </div>
+    </div>
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-7">
+                <div class="card shadow-lg border-0 rounded-4">
+                    <div class="card-body p-5">
+                    <h2 class="mb-4 text-center text-primary">Register a New CIS User</h2>
+
+                    <!-- Feedback Messages -->
+                    {% if messages %}
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- CIS Registration Form -->
+                    <form method="POST" novalidate>
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                        <label for="staff_id" class="form-label">Staff ID</label>
+                        <input type="number" class="form-control" name="staff_id" required>
+                        </div>
+
+                        <div class="mb-3">
+                        <label for="license_number" class="form-label">License Number</label>
+                        <input type="text" class="form-control" name="license_number" required>
+                        </div>
+
+                        <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="first_name" class="form-label">First Name</label>
+                            <input type="text" class="form-control" name="first_name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="last_name" class="form-label">Last Name</label>
+                            <input type="text" class="form-control" name="last_name" required>
+                        </div>
+                        </div>
+
+                        <div class="mb-3">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" name="email" required>
+                        </div>
+
+                        <div class="mb-3">
+                        <label for="phone_number" class="form-label">Phone Number</label>
+                        <input type="text" class="form-control" name="phone_number">
+                        </div>
+
+                        <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="password1" class="form-label">Password</label>
+                            <input type="password" class="form-control" name="password1" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="password2" class="form-label">Confirm Password</label>
+                            <input type="password" class="form-control" name="password2" required>
+                        </div>
+                        </div>
+
+                        <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg mt-3">Register CIS</button>
+                        </div>
+                    </form>
+
+                    <!-- District Info Display -->
+                    <div class="mt-4 text-muted small text-center">
+                        <em>Assigned to district: <strong>{{ district.name }}</strong></em>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered custom-modal">
+            <div class="modal-content text-center p-4 shadow-sm rounded-4 border-0">
+                <div class="modal-body px-3">
+                    <div class="mb-3">
+                        <i class="fa fa-exclamation-circle text-warning" style="font-size: 40px;"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">Are you sure?</h5>
+                    <p class="text-muted small">You want to logout of the system?</p>
+                </div>
+                <div class="d-flex gap-2 px-3 pb-3">
+                    <div class="d-flex gap-2 px-3 pb-3">
+                        <div class="d-flex justify-content-center gap-2 px-3 pb-3">
+                            <div class="d-flex justify-content-center gap-3 px-3 pb-3">
+                                <button type="button" class="btn custom-btn rounded-pill px-4" data-bs-dismiss="modal">
+                                    Cancel
+                                </button>
+                                <button type="button" class="btn custom-btn danger-btn rounded-pill px-4" id="confirmLogout">
+                                    Logout
+                                </button>
+                            </div>
+                            
+                        </div>
+                        
+                    </div>
+                    
+                </div>                
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        
+        document.addEventListener("DOMContentLoaded", function () {
+            const logoutBtn = document.getElementById("logoutBtn");
+            const confirmLogout = document.getElementById("confirmLogout");
+            const logoutUrl = logoutBtn.getAttribute("data-logout-url");
+    
+            const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
+    
+            logoutBtn.addEventListener("click", function (e) {
+                e.preventDefault();
+                logoutModal.show();
+            });
+    
+            confirmLogout.addEventListener("click", function () {
+                window.location.href = logoutUrl;
+            });
+        });
+        
+        const userIcon = document.getElementById('userIcon');
+        const userDropdown = document.getElementById('userDropdown');
+
+        userIcon.addEventListener('click', () => {
+            userDropdown.classList.toggle('d-none');
+        });
+
+        // Optional: Close dropdown when clicking outside
+        window.addEventListener('click', (e) => {
+            if (!e.target.closest('.user-dropdown-wrapper')) {
+                userDropdown.classList.add('d-none');
+            }
+        });
+    </script>
+</body>
+</html>

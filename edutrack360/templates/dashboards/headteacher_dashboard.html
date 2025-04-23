@@ -7,7 +7,41 @@
     <title>Headteacher Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="{% static 'css/headteacher_dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <link rel="icon" type="image/png" href="{% static 'edu favicon.png' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        .total-students-assessed {
+            border-left-color: #22027c;
+            color: #22027c;
+        }
+
+        .total-teachers {
+            border-left-color: #035db1;
+            color: #035db1;
+        }
+
+        .average-school-performance {
+            border-left-color: #028593;
+            color: #028593;
+        }
+
+        .best-performing-subjects {
+            border-left-color: #089d2a;
+            color: #089d2a;
+        }
+
+        .weakest-performing-subjects {
+            border-left-color: #DC3545;
+            color: #DC3545;
+        }
+
+        .best-performing-classes {
+            border-left-color: #6904b2;
+            color: #6904b2;
+        }
+        
+    </style>
 </head>
 <body>
     <div class="navbar">
@@ -17,23 +51,32 @@
         </a>
         </div>
         <div class="navbar-icons">
-            <div class="notification-container">
-                <!-- Notification Bell Icon -->
-                <button id="notificationBell" class="btn">
-                    <i class="fa fa-bell"></i>
-                    <span id="notificationCount" class="badge">0</span>
-                </button>
+            <div class="notification-wrapper position-relative" style="cursor: pointer;" id="notificationBell">
+                <i class="fa fa-bell fs-4"></i>
+                <span id="notificationDot" class="position-absolute top-0 start-100 translate-middle badge rounded-circle bg-danger d-none" style="width: 10px; height: 10px; padding: 0;"></span>
+            </div>
             
-                <!-- Dropdown Menu -->
-                <div id="notificationDropdown" class="dropdown-menu">
-                    <ul id="notificationList">Loading...</ul>
-                    <div class="dropdown-footer">
-                        <a href="#">View all</a>
-                    </div>
+            <!-- User Icon with Dropdown -->
+            <div class="user-dropdown-wrapper position-relative" style="display: inline-block;">
+                <i class="fas fa-user-circle" id="userIcon" style="cursor: pointer;"></i>
+                
+                <!-- Dropdown -->
+                <div id="userDropdown" class="user-dropdown position-absolute end-0 mt-2 d-none">
+                    <ul class="list-unstyled mb-0">
+                        <li class="dropdown-item active">Profile</li>
+                        <li class="dropdown-item">Account Settings</li>
+                        <li class="dropdown-item logout">
+                            <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link">
+                                <i class="fas fa-sign-out-alt me-2"></i>
+                                Logout
+                            </a>
+                        </li>
+                    </ul>                    
                 </div>
             </div>
-            <i class="fas fa-user-circle"></i>
+            
             <span class="welcome-text">Welcome, {{ user.first_name }}</span>
+            
         </div>
     </div>
 
@@ -62,19 +105,22 @@
             <i class="fas fa-file-upload"></i>
             <span class="tooltip">Submit Results</span>
         </a>
-        <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link">
-            <i class="fas fa-sign-out-alt"></i>
-            <span class="tooltip">Logout</span>
-        </a>
     </div>
 
     <div class="main-content">
         <div class="container mt-4">
+            {% if deadline_status %}
+            <div class="alert alert-{{ deadline_status.status }} alert-dismissible fade show" role="alert" id="deadlineAlert">
+                <strong class="fs-5">{{ deadline_status.message }}</strong>
+                <p class="fs-6">Deadline: {{ deadline_status.deadline_date }}</p>
+            </div>
+            {% endif %}
             <div class="dashboard-header text-center text-md-start" style="margin-bottom: 0px; padding: 2px 0;">
                 <h3 class="fw-bold" style="margin: 0;">
                     {{ request.user.school|default:"Your" }} Dashboard
                 </h3>
             </div>
+            
             <!-- Filters -->
             <div class="row g-3 mb-4 align-items-end">
                 <div class="col-md-6">
@@ -187,21 +233,35 @@
             </div>
         </div>
     </div>
+    
     <!-- Logout Confirmation Modal -->
     <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content text-center p-4 rounded-4 shadow-lg">
-                <div class="modal-body">
+        <div class="modal-dialog modal-dialog-centered custom-modal">
+            <div class="modal-content text-center p-4 shadow-sm rounded-4 border-0">
+                <div class="modal-body px-3">
                     <div class="mb-3">
-                        <i class="fa fa-exclamation-circle text-warning" style="font-size: 50px;"></i>
+                        <i class="fa fa-exclamation-circle text-warning" style="font-size: 40px;"></i>
                     </div>
-                    <h4 class="fw-bold">Are you sure?</h4>
-                    <p class="text-muted">You want to logout of the system?</p>
+                    <h5 class="fw-bold mb-2">Are you sure?</h5>
+                    <p class="text-muted small">You want to logout of the system?</p>
                 </div>
-                <div class="modal-footer border-0 d-flex justify-content-center">
-                    <button type="button" class="btn btn-danger px-4 py-2 rounded-pill" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-success px-4 py-2 rounded-pill" id="confirmLogout">Logout!</button>
-                </div>
+                <div class="d-flex gap-2 px-3 pb-3">
+                    <div class="d-flex gap-2 px-3 pb-3">
+                        <div class="d-flex justify-content-center gap-2 px-3 pb-3">
+                            <div class="d-flex justify-content-center gap-3 px-3 pb-3">
+                                <button type="button" class="btn custom-btn rounded-pill px-4" data-bs-dismiss="modal">
+                                    Cancel
+                                </button>
+                                <button type="button" class="btn custom-btn danger-btn rounded-pill px-4" id="confirmLogout">
+                                    Logout
+                                </button>
+                            </div>
+                            
+                        </div>
+                        
+                    </div>
+                    
+                </div>                
             </div>
         </div>
     </div>
@@ -211,6 +271,33 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        function formatPercent(value) {
+            return value !== null && !isNaN(value) ? parseFloat(value).toFixed(2) + "%" : "N/A";
+        }
+    
+        $(document).ready(function () {
+        // Load dashboard data on page load
+            fetchHeadteacherDashboardData();
+
+            // Scroll to "Recent Uploads" and hide red dot on bell click
+            $("#notificationBell").click(function (event) {
+                event.preventDefault();
+
+                const target = $(".recent-uploads");
+                if (target.length) {
+                    $("html, body").animate({
+                        scrollTop: target.offset().top - 100
+                    }, 600);
+
+                    // Hide the red notification dot
+                    $("#notificationDot").addClass("d-none");
+                }
+            });
+
+            // Detect changes to year/term filters
+            $("#yearFilter, #termFilter").on("change", fetchHeadteacherDashboardData);
+        });
+
         function formatPercent(value) {
             return value !== null && !isNaN(value) ? parseFloat(value).toFixed(2) + "%" : "N/A";
         }
@@ -228,37 +315,39 @@
                     $(".average-school-performance .value").text(formatPercent(data.total_school_average));
                     $(".total-teachers .value").text(data.total_teachers || 0);
 
-                    // Best Subjects
-                    let bestHtml = data.best_performing_subjects.length
+                    const bestHtml = data.best_performing_subjects.length
                         ? data.best_performing_subjects.map(s => `<li>${s.subject} (${formatPercent(s.average_score)})</li>`).join("")
                         : "<li>No data available</li>";
                     $(".best-performing-subjects .value").html(bestHtml);
 
-                    // Weakest Subjects
-                    let weakHtml = data.worst_performing_subjects.length
+                    const weakHtml = data.worst_performing_subjects.length
                         ? data.worst_performing_subjects.map(s => `<li>${s.subject} (${formatPercent(s.average_score)})</li>`).join("")
                         : "<li>No data available</li>";
                     $(".weakest-performing-subjects .value").html(weakHtml);
 
-                    // Best Classes
-                    let classHtml = data.best_performing_classes.length
+                    const classHtml = data.best_performing_classes.length
                         ? data.best_performing_classes.map(c => `<li>${c.class_name} (${formatPercent(c.average_score)})</li>`).join("")
                         : "<li>No data available</li>";
                     $(".best-performing-classes .value").html(classHtml);
 
-                    // Uploads
-                    let notifHtml = data.notifications.length
+                    const notifHtml = data.notifications.length
                         ? data.notifications.map(n => `<li>${n}</li>`).join("")
                         : "<li>No recent uploads</li>";
                     $(".recent-uploads").html(notifHtml);
 
-                    // Chart
+                    // Show red dot only if there are new notifications
+                    if (data.notifications.length > 0) {
+                        $("#notificationDot").removeClass("d-none");
+                    } else {
+                        $("#notificationDot").addClass("d-none");
+                    }
+
                     updateTrendChart(data.performance_trends);
                 }
             });
         }
 
-        // Chart Init (Bar Chart for Class Performance)
+        // Chart logic
         const ctx = document.getElementById("performanceTrendsChart").getContext("2d");
         const trendChart = new Chart(ctx, {
             type: "bar",
@@ -294,103 +383,89 @@
         });
 
         function updateTrendChart(trendData) {
-            const labels = trendData.map(e => e.class_name);  // ✅ X-axis: class names
-            const scores = trendData.map(e => e.score);       // ✅ Y-axis: average scores
+            const labels = trendData.map(e => e.class_name);
+            const scores = trendData.map(e => e.score);
             trendChart.data.labels = labels;
             trendChart.data.datasets[0].data = scores;
             trendChart.update();
         }
-
+    
         // Filter change listeners
         $("#yearFilter, #termFilter").on("change", fetchHeadteacherDashboardData);
-
+    
         // Initial load
         $(document).ready(fetchHeadteacherDashboardData);
-
-        function fetchHeadteacherNotifications() {
-            $.ajax({
-                url: "{% url 'school:get_headteacher_notifications' %}",  // Update URL to fetch notifications for Headteacher
-                method: "GET",
-                success: function (response) {
-                    const notificationList = $("#notificationList");
-                    const notificationCount = $("#notificationCount");
-
-                    notificationList.empty();
-
-                    if (response.notifications.length > 0) {
-                        response.notifications.forEach(notification => {
-                            const li = `<li data-id="${notification.id}" class="notification-item">
-                                ${notification.message} <br>
-                                <small>${notification.sent_at}</small>
-                            </li>`;
-                            notificationList.append(li);
-                        });
-
-                        notificationCount.text(response.notifications.length).show();
-                    } else {
-                        notificationList.append('<li class="no-notifications">No new notifications</li>');
-                        notificationCount.hide();
-                    }
-                },
-                error: function () {
-                    console.error("Error fetching notifications.");
-                }
-            });
-        }
-
-        // Mark notification as read
-        $(document).on("click", ".notification-item", function () {
-            const notificationId = $(this).data("id");
-            const notificationItem = $(this);
-
-            $.ajax({
-                url: `/school/notifications/mark-as-read/${notificationId}/`,  // URL for marking notification as read
-                method: "POST",
-                headers: { "X-CSRFToken": "{{ csrf_token }}" },
-                success: function () {
-                    notificationItem.fadeOut(300, function () {
-                        $(this).remove();
-                        fetchHeadteacherNotifications();  // Re-fetch notifications after marking one as read
-                    });
-                },
-                error: function () {
-                    console.error("Failed to mark notification as read.");
-                }
-            });
-        });
-
-        setInterval(fetchHeadteacherNotifications, 30000);  // Fetch notifications every 30 seconds
-
-        // Toggle notifications dropdown
+    
+        // ✅ Scroll to "Recent Uploads" when the notification bell is clicked
         $("#notificationBell").click(function (event) {
-            event.stopPropagation();
-            $("#notificationDropdown").toggleClass("show");
+            event.preventDefault();
+            $('html, body').animate({
+                scrollTop: $(".recent-uploads").offset().top
+            }, 500);
         });
-
-        $(document).click(function (event) {
-            if (!$(event.target).closest(".notification-container").length) {
-                $("#notificationDropdown").removeClass("show");
-            }
-        });
-
-
-
+    
+        // Logout Modal
         document.addEventListener("DOMContentLoaded", function () {
             const logoutBtn = document.getElementById("logoutBtn");
             const confirmLogout = document.getElementById("confirmLogout");
             const logoutUrl = logoutBtn.getAttribute("data-logout-url");
-
+    
             const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
-
+    
             logoutBtn.addEventListener("click", function (e) {
                 e.preventDefault();
                 logoutModal.show();
             });
-
+    
             confirmLogout.addEventListener("click", function () {
                 window.location.href = logoutUrl;
             });
         });
+    
+        const alertElement = document.getElementById("deadlineAlert");
+    
+        if (alertElement) {
+            let flashInterval;
+    
+            function flashAlert() {
+                alertElement.classList.toggle("flashing");
+            }
+    
+            const currentDate = new Date();
+            const deadlineDate = new Date("{{ deadline_status.deadline_date }}");
+            const timeRemaining = deadlineDate - currentDate;
+    
+            if (timeRemaining <= 14 * 24 * 60 * 60 * 1000 && timeRemaining > 0) {
+                flashInterval = setInterval(flashAlert, 1000);
+            }
+    
+            alertElement.classList.add("show");
+    
+            if (currentDate >= deadlineDate) {
+                setTimeout(function () {
+                    alertElement.classList.add("custom-fade-out");
+                }, 20000);
+            }
+    
+            alertElement.addEventListener("close", function () {
+                clearInterval(flashInterval);
+            });
+        }
+        
+        const userIcon = document.getElementById('userIcon');
+        const userDropdown = document.getElementById('userDropdown');
+
+        userIcon.addEventListener('click', () => {
+            userDropdown.classList.toggle('d-none');
+        });
+
+        // Optional: Close dropdown when clicking outside
+        window.addEventListener('click', (e) => {
+            if (!e.target.closest('.user-dropdown-wrapper')) {
+                userDropdown.classList.add('d-none');
+            }
+        });
     </script>
+
 </body>
 </html>

@@ -1,135 +1,89 @@
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
-from django.db.models import Q
-import json
-
-@login_required
-def subject_performance_analysis(request):
-    """Generates subject performance analysis for a subject teacher with clear structure."""
-
-    filter_options = json.loads(get_available_terms(request).content)
-    academic_year = request.GET.get("academic_year", "").strip()
-    selected_term = request.GET.get("term", "all")
-    selected_subject = request.GET.get("subject", "all")
-    selected_class = request.GET.get("class_group", "all")
-
-    valid_years = [year["name"] for year in filter_options["academic_years"]]
-    academic_year = academic_year if academic_year in valid_years else filter_options["selected_academic_year"]
-
-    base_year = int(academic_year.split("/")[0])
-    prev_1 = f"{base_year - 1}/{base_year}"
-    prev_2 = f"{base_year - 2}/{base_year - 1}"
-    academic_years = [prev_2, prev_1, academic_year]
-
-    all_terms = [t["name"] for t in filter_options["terms"]]
-    selected_term = selected_term if selected_term in all_terms else "Term 1"
-
-    # Term-sequence logic
-    if selected_term == "Term 1":
-        term_sequence = [("Term 2", prev_1), ("Term 3", prev_1), ("Term 1", academic_year)]
-    elif selected_term == "Term 2":
-        term_sequence = [("Term 3", prev_1), ("Term 1", academic_year), ("Term 2", academic_year)]
-    else:  # Term 3
-        term_sequence = [("Term 1", academic_year), ("Term 2", academic_year), ("Term 3", academic_year)]
-
-    terms_to_fetch = [t[0] for t in term_sequence]
-    term_keys = [f"{t} ({y})" for t, y in term_sequence]
-
-    teacher = request.user.teacher_profile
-    assigned_teachings = SubjectTeacher.objects.filter(teacher=teacher).select_related("subject").prefetch_related("assigned_classes")
-    assigned_subjects = {st.subject.name for st in assigned_teachings}
-    assigned_subject_ids = {st.subject.id for st in assigned_teachings}
-    assigned_classes = {cg.id for st in assigned_teachings for cg in st.assigned_classes.all()}
-
-    if selected_subject != "all":
-        subject_obj = Subject.objects.filter(name=selected_subject).first()
-        if subject_obj:
-            assigned_subjects, assigned_subject_ids = {selected_subject}, {subject_obj.id}
-        else:
-            assigned_subjects, assigned_subject_ids = set(), set()
-
-    if selected_class != "all":
-        try:
-            selected_class_id = int(selected_class)
-            if selected_class_id in assigned_classes:
-                assigned_classes = {selected_class_id}
-        except ValueError:
-            pass
-
-    if not assigned_subjects or not assigned_classes:
-        return render(request, "teacher/subject_performance_analysis.html", {
-            "student_rows": [], "class_average_row": {},
-            "term_trend": {}, "academic_trend": {},
-            "terms": all_terms, "academic_years": valid_years,
-            "selected_year": academic_year, "selected_term": selected_term,
-            "selected_subject": selected_subject, "selected_class": selected_class,
-            "subjects": list(assigned_subjects), "assigned_classes": [],
-        })
-
-    # Construct Q object for filtering term/year pairs
-    q_terms = Q()
-    for term, year in term_sequence:
-        q_terms |= Q(term=term, academic_year=year)
-
-    marks = StudentMark.objects.filter(
-        class_group_id__in=assigned_classes,
-        subject_id__in=assigned_subject_ids,
-        student__school_id=teacher.school.id
-    ).filter(q_terms).select_related("student", "subject").order_by("student__last_name")
-
-    # Data containers
-    student_subject_marks = {}
-    class_aggregates = {k: [] for k in term_keys}
-    year_aggregate = {y: [] for y in academic_years}
-
-    for mark in marks:
-        if mark.subject.name != selected_subject:
-            continue
-        student_name = f"{mark.student.last_name} {mark.student.first_name}"
-        key = f"{mark.term} ({mark.academic_year})"
-        student_subject_marks.setdefault(student_name, {})[key] = round(mark.mark, 2)
-        class_aggregates[key].append(mark.mark)
-        year_aggregate[mark.academic_year].append(mark.mark)
-
-    # Student table rows
-    student_rows = []
-    for student, marks_dict in student_subject_marks.items():
-        row = {"name": student}
-        for key in term_keys:
-            row[key] = marks_dict.get(key, "-")
-        student_rows.append(row)
-
-    # Class average row
-    class_average_row = {"name": "Class Average"}
-    for key in term_keys:
-        scores = class_aggregates[key]
-        class_average_row[key] = round(sum(scores)/len(scores), 2) if scores else "-"
-
-    # Term trend row
-    term_trend = {"Subject": selected_subject}
-    for key in term_keys:
-        scores = class_aggregates[key]
-        term_trend[key] = round(sum(scores)/len(scores), 2) if scores else "-"
-
-    # Academic trend row
-    academic_trend = {
-        "Subject": selected_subject,
-        **{year: round(sum(m)/len(m), 2) if m else "-" for year, m in year_aggregate.items()}
+<style>
+    .user-menu {
+        position: relative;
+        display: inline-block;
+        font-family: 'Segoe UI', sans-serif;
     }
+    
+    .user-info {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        padding: 10px;
+    }
+    
+    .username {
+        margin-right: 10px;
+        font-size: 14px;
+        color: #444;
+    }
+    
+    .avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+    
+    .dropdown-menu {
+        display: none;
+        position: absolute;
+        top: 50px;
+        right: 0;
+        background: white;
+        box-shadow: 0px 3px 12px rgba(0, 0, 0, 0.15);
+        border-radius: 5px;
+        overflow: hidden;
+        z-index: 999;
+    }
+    
+    .dropdown-menu ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .dropdown-menu li {
+        padding: 12px 20px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.3s ease;
+    }
+    
+    .dropdown-menu li:hover {
+        background: #f0f0f0;
+    }
+    
+    .dropdown-menu li.active {
+        background: #4cd964;
+        color: white;
+    }
+    
+    .dropdown-menu li.logout {
+        border-top: 1px solid #eee;
+        font-weight: bold;
+    }
+</Style>  
 
-    class_groups = {cg.id: cg.name for cg in ClassGroup.objects.filter(id__in=assigned_classes)}
+<div class="user-menu">
+    <div class="user-info" onclick="toggleMenu()">
+        <span class="username">ROBIN WILLIS</span>
+        <img src="user-avatar.jpg" alt="User Avatar" class="avatar">
+    </div>
+    <div class="dropdown-menu" id="dropdownMenu">
+        <ul>
+            <li>Settings</li>
+            <li class="active">Profile</li>
+            <li class="logout">Logout</li>
+        </ul>
+    </div>
+</div>
+<script>
+    function toggleMenu() {
+        const menu = document.getElementById('dropdownMenu');
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
 
-    return render(request, "teacher/subject_performance_analysis.html", {
-        "student_rows": student_rows,
-        "class_average_row": class_average_row,
-        "term_trend": term_trend,
-        "academic_trend": academic_trend,
-        "terms": all_terms,
-        "academic_years": valid_years,
-        "selected_year": academic_year,
-        "selected_term": selected_term,
-        "selected_subject": selected_subject,
-        "selected_class": selected_class,
-        "subjects": list(assigned_subjects),
-        "assigned_classes": [{"id": cid, "name": class_groups[cid]} for cid in assigned_classes],
-    })
+</script>
+  
+  

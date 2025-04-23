@@ -6,9 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>School Management</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="icon" type="image/png" href="{% static 'edu favicon.png' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
         body {
+            overflow: auto;
             font-family: 'Calibri', sans-serif;
             margin: 0;
             background-color: #e0f7fa;
@@ -68,6 +70,12 @@
             gap: 8px;
         }
 
+        .btn-group {
+            display: flex;
+            gap: 10px; /* Adjust spacing between buttons */
+        }
+
+
         .alert {
             position: fixed;
             top: 20px;
@@ -107,6 +115,18 @@
             gap: 20px;
             flex-wrap: wrap;
         }
+        @media (max-width: 768px) {
+            .logo-img {
+                max-width: 100px;
+                
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo-img {
+                max-width: 80px;   
+            }
+        }
 
     </style>
 </head>
@@ -123,10 +143,12 @@
     <main class="container mt-4">
         <div id="notification" class="alert d-none" role="alert"></div>
     
-        <div class="text-center mb-3">
-            <button id="manualUploadButton" class="btn btn-primary btn-custom">📄 Manual Upload</button>
-            <button id="bulkUploadButton" class="btn btn-secondary btn-custom">📂 Bulk Onboarding</button>
-            <button id="downloadTemplateButton" class="btn btn-success btn-custom">⬇️ Download Template</button>
+        <div class="d-flex justify-content-center mb-4">
+            <div class="btn-group">
+                <button id="manualUploadButton" class="btn btn-primary">📄 Manual Upload</button>
+                <button id="bulkUploadButton" class="btn btn-secondary">📂 Bulk Onboarding</button>
+                <button id="downloadTemplateButton" class="btn btn-success">⬇️ Download Template</button>
+            </div>
         </div>
     
         <div id="templateContainer" class="template-container">
@@ -169,12 +191,12 @@
         function loadManualUploadForm() {
             const container = document.getElementById("templateContainer");
             if (!container) return;
-
+    
             container.innerHTML = `
                 <h2 class="text-center">Manual Upload</h2>
                 <form id="manualUploadForm" action="/cis/school/manual/upload/" method="POST" class="p-3 border rounded">
                     <input type="hidden" name="csrfmiddlewaretoken" value="${getCSRFToken()}">
-
+    
                     <div class="mb-3">
                         <label class="form-label">School Name:</label>
                         <input type="text" class="form-control" name="name" required>
@@ -189,15 +211,21 @@
                             <option value="">Select Circuit</option>
                         </select>
                     </div>
-
+                    <div class="mb-3">
+                        <label class="form-label">Departments:</label>
+                        <select class="form-control" name="departments" multiple required>
+                            <!-- Options loaded dynamically -->
+                        </select>
+                    </div>
+    
                     <button type="submit" class="btn btn-success w-100">Upload School</button>
                 </form>
             `;
-
+    
             attachManualUploadFormListener();
             populateCircuits();
+            populateDepartments();
         }
-
     
         function attachManualUploadFormListener() {
             document.getElementById("manualUploadForm")?.addEventListener("submit", async function (event) {
@@ -211,7 +239,10 @@
                 <h2 class="text-center">Bulk Upload</h2>
                 <form id="bulkUploadForm" action="/cis/school/bulk/upload/" method="POST" enctype="multipart/form-data" class="p-3 border rounded">
                     <input type="hidden" name="csrfmiddlewaretoken" value="${getCSRFToken()}">
-                    <div class="mb-3"><label class="form-label">Upload CSV File:</label><input type="file" class="form-control" name="file" accept=".csv,.xls,.xlsx" required></div>
+                    <div class="mb-3">
+                        <label class="form-label">Upload CSV File:</label>
+                        <input type="file" class="form-control" name="file" accept=".csv,.xls,.xlsx" required>
+                    </div>
                     <button type="submit" class="btn btn-success w-100">Upload</button>
                 </form>
             `;
@@ -228,6 +259,14 @@
     
         async function handleFormSubmit(form, successMessage, errorMessage) {
             const formData = new FormData(form);
+    
+            // Handle multi-select departments manually
+            const deptSelect = form.querySelector('select[name="departments"]');
+            if (deptSelect) {
+                const selectedDepartments = Array.from(deptSelect.selectedOptions).map(opt => opt.value);
+                selectedDepartments.forEach(val => formData.append("departments", val));
+            }
+    
             showNotification("Processing request...", "info");
     
             try {
@@ -285,25 +324,21 @@
         async function populateCircuits() {
             const select = document.querySelector('select[name="circuit"]');
             if (!select) return;
-
-            // Clear previous options if any
+    
             select.innerHTML = "";
-
-            // Add default placeholder option
             const placeholder = document.createElement("option");
             placeholder.value = "";
             placeholder.textContent = "Select Circuit";
             placeholder.disabled = true;
             placeholder.selected = true;
             select.appendChild(placeholder);
-
+    
             try {
                 const response = await fetch("/cis/circuits/");
                 const circuits = await response.json();
-
-                // Sort alphabetically
+    
                 circuits.sort((a, b) => a.name.localeCompare(b.name));
-
+    
                 circuits.forEach(c => {
                     const opt = document.createElement("option");
                     opt.value = c.id;
@@ -314,7 +349,27 @@
                 console.error("Failed to fetch circuits:", err);
             }
         }
-
-    </script>
+    
+        async function populateDepartments() {
+            const select = document.querySelector('select[name="departments"]');
+            if (!select) return;
+    
+            try {
+                const response = await fetch("/cis/departments/");
+                const departments = await response.json();
+    
+                departments.sort((a, b) => a.name.localeCompare(b.name));
+    
+                departments.forEach(dep => {
+                    const opt = document.createElement("option");
+                    opt.value = dep.id;
+                    opt.textContent = dep.name;
+                    select.appendChild(opt);
+                });
+            } catch (err) {
+                console.error("Failed to fetch departments:", err);
+            }
+        }
+    </script>    
 </body>
 </html>

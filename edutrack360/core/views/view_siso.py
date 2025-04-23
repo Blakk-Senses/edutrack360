@@ -1,44 +1,34 @@
-from django.views.decorators.csrf import csrf_exempt
+# --- Standard Library ---
+import json
+from io import BytesIO
+from collections import defaultdict
 
-import csv
+# --- Django Core ---
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render, redirect
+from django.db.models import Q
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse_lazy, reverse
-from django.contrib.auth import get_user_model
-from django.http import HttpResponse
-from collections import defaultdict
-import json
-from itertools import chain
-from rest_framework.response import Response
-from core.models import (District, Teacher, Notification, 
-    StudentMark, Result, School, SchoolSubmission, 
-    Circuit)
-from collections import defaultdict
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet
-import matplotlib.pyplot as plt
-from io import BytesIO
-from django.http import HttpResponse
-import json
-from matplotlib.backends.backend_pdf import FigureCanvasPdf as FigureCanvas
-from django.shortcuts import redirect
-from django.contrib.auth.decorators import login_required
-from reportlab.graphics.shapes import Drawing, String
-from reportlab.graphics.charts.barcharts import VerticalBarChart
-from django.db.models import Count, Avg, F, Q, Max
-from django.http import JsonResponse, HttpResponse
-from django.shortcuts import get_object_or_404
-from django.http import JsonResponse
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 from django.views.decorators.http import require_POST
-from core.forms import NotificationForm
+
+# --- ReportLab for PDF ---
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer, Image
+)
+
+# --- Matplotlib for Charts ---
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import FigureCanvasPdf as FigureCanvas
+
+# --- Internal App Imports ---
+from core.models import (
+    Notification, StudentMark, School,
+)
 
 User = get_user_model()
 

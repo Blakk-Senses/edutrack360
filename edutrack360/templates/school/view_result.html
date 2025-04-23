@@ -54,21 +54,57 @@
     
         {% if results %}
         <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-primary">
-                    <tr>
-                        <th class="text-start">Student</th>
-                        <th class="text-center">Mark</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for result in results %}
-                    <tr>
-                        <td class="text-start">{{ result.student.last_name }} {{ result.student.first_name }}</td>
-                        <td class="text-center">{{ result.mark }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
+            <table class="table table-striped table-bordered">
+              <thead class="table-dark">
+                <tr>
+                  <th>Student</th>
+                  <th>CAT1</th>
+                  <th>Project Work</th>
+                  <th>CAT2</th>
+                  <th>Group Work</th>
+                  <th>Total CA</th>
+                  <th>CA 50%</th>
+                  <th>Exam Score</th>
+                  <th>Exam 50%</th>
+                  <th>Final Mark</th>
+                  <th>Position</th>
+                  <th>Remark</th>
+                  <th>Status</th>
+                  {% if not read_only %}
+                  <th>Actions</th>
+                  {% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for entry in results %}
+                <tr id="result-{{ entry.result.id }}">
+                  <td>{{ entry.result.student.first_name }} {{ entry.result.student.last_name }}</td>
+                  <td>{{ entry.result.cat1 }}</td>
+                  <td>{{ entry.result.project_work }}</td>
+                  <td>{{ entry.result.cat2 }}</td>
+                  <td>{{ entry.result.group_work }}</td>
+                  <td>{{ entry.total_ca }}</td>
+                  <td>{{ entry.ca_50 }}</td>
+                  <td>{{ entry.result.exam_score }}</td>
+                  <td>{{ entry.exam_50 }}</td>
+                  <td>{{ entry.final_mark }}</td>
+                  <td>{{ entry.position }}</td>
+                  <td>{{ entry.remark }}</td>
+                  <td>{{ entry.result.status }}</td>
+                  {% if not read_only %}
+                  <td>
+                    <button class="btn btn-sm btn-danger delete-entry-btn" data-id="{{ entry.result.id }}">
+                      Delete
+                    </button>
+                  </td>
+                  {% endif %}
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="14" class="text-center">No results available.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
             </table>
         </div>
         {% else %}

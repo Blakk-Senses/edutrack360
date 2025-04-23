@@ -25,8 +25,9 @@
             font-family: 'Calibri', sans-serif;
             margin: 0;
             background-color: #e0f7fa;
-            padding-top: 80px;
+            padding-top: 50px; /* Ensures content doesn't overlap with navbar */
         }
+
         .navbar {
             background-color: #003a3b;
             color: white;
@@ -36,16 +37,58 @@
             z-index: 1000;
             padding: 10px 20px;
         }
+
         .logo-img {
             max-width: 120px;
             height: auto;
         }
+
+        .container {
+            margin-left: 100px;
+            margin-top: 20px;
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin-left: 60px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin-left: 0px;
+            }
+            .logo-img {
+                max-width: 90px;
+                height: auto;
+            }
+        }
+
         .card {
             border-radius: 10px;
             box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
         }
         .text-center {
             color: rgb(1, 107, 107);
+        }
+
+        /* Shrink table font and padding on smaller screens */
+        @media (max-width: 480px) {
+            .responsive-shrink-table {
+                font-size: 0.6rem;
+            }
+
+            .responsive-shrink-table th,
+            .responsive-shrink-table td {
+                white-space: normal; /* Allow wrapping */
+                word-break: break-word;
+                text-align: center;
+            }
+
+            .responsive-shrink-table th {
+                font-weight: 600;
+            }
         }
     </style>
 </head>
@@ -134,11 +177,11 @@
             </div>
         </div>
         <div class="row mb-5">
-            <!-- 🎯 Score Distribution Pie Chart -->
+            <!--Score Distribution Doughnut Chart -->
             <div class="col-md-6 mb-4">
                 <div class="card h-100 shadow-sm border-0">
                     <div class="card-body">
-                        <h6 class="card-title text-secondary">🎯 Score Distribution</h6>
+                        <h6 class="card-title text-secondary">Score Distribution</h6>
                         <div class="chart-container" style="position: relative; width: 100%; max-width: 400px; margin: auto;">
                             <canvas id="scorePieChart"></canvas>
                         </div>
@@ -146,11 +189,11 @@
                 </div>
             </div>
         
-            <!-- 🧊 Heatmap -->
+            <!-- 🧊 Bar Chart -->
             <div class="col-md-6 mb-4">
                 <div class="card h-100 shadow-sm border-0">
                     <div class="card-body">
-                        <h6 class="card-title text-secondary">🧊 Performance Heatmap</h6>
+                        <h6 class="card-title text-secondary">Performance Bar Chart</h6>
                         <div id="heatmapContainer" class="d-flex flex-wrap gap-2">
                             <!-- Filled by JS -->
                         </div>
@@ -231,22 +274,32 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            // === Pie Chart ===
+            // === Doughnut Chart ===
             const scorePieCtx = document.getElementById('scorePieChart')?.getContext('2d');
             if (scorePieCtx) {
                 new Chart(scorePieCtx, {
-                    type: 'pie',
+                    type: 'doughnut',
                     data: {
-                        labels: ['80-100', '55-79', '50-54', '40-49', '0-39'],
+                        labels: [
+                            '90-100', '80-89', '70-79', '60-69',
+                            '55-59', '50-54', '45-49', '40-44', '0-39'
+                        ],
                         datasets: [{
                             data: [
-                                {{ bucket_80_100 }},
-                                {{ bucket_55_79 }},
+                                {{ bucket_90_100 }},
+                                {{ bucket_80_89 }},
+                                {{ bucket_70_79 }},
+                                {{ bucket_60_69 }},
+                                {{ bucket_55_59 }},
                                 {{ bucket_50_54 }},
-                                {{ bucket_40_49 }},
+                                {{ bucket_45_49 }},
+                                {{ bucket_40_44 }},
                                 {{ bucket_0_39 }}
                             ],
-                            backgroundColor: ['#28a745', '#007bff', '#adb5bd', '#fd7e14', '#dc3545'],
+                            backgroundColor: [
+                                '#146c43', '#28a745', '#51cf66', '#a9e34b',
+                                '#ffd43b', '#ffa94d', '#ff922b', '#fa5252', '#e03131'
+                            ],
                             borderWidth: 1
                         }]
                     },
@@ -259,32 +312,56 @@
                     }
                 });
             }
-
-            // === Heatmap ===
-            function getHeatColor(mark) {
-                if (mark >= 80) return '#28a745';
-                if (mark >= 55) return '#007bff';
-                if (mark >= 50) return '#adb5bd';
-                if (mark >= 40) return '#fd7e14';
-                return '#dc3545';
-            }
-
+        
+            // === Bar Chart === (Replacing Heatmap)
             const heatmapData = {{ heatmap_data|safe }};
             const heatmapContainer = document.getElementById('heatmapContainer');
             if (heatmapContainer && heatmapData.length) {
-                heatmapData.forEach(item => {
-                    const shade = getHeatColor(item.mark);
-                    const badge = document.createElement('span');
-                    badge.className = 'badge text-white p-2 rounded m-1';
-                    badge.style.backgroundColor = shade;
-                    badge.innerText = `${item.name}: ${item.mark}`;
-                    heatmapContainer.appendChild(badge);
+                const names = heatmapData.map(item => item.name);
+                const scores = heatmapData.map(item => item.mark);
+        
+                const barCanvas = document.createElement('canvas');
+                heatmapContainer.innerHTML = '';  // Clear old heatmap
+                heatmapContainer.appendChild(barCanvas);
+        
+                new Chart(barCanvas.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: names,
+                        datasets: [{
+                            label: 'Student Scores',
+                            data: scores,
+                            backgroundColor: scores.map(mark => {
+                                if (mark >= 90) return '#146c43';
+                                if (mark >= 80) return '#28a745';
+                                if (mark >= 70) return '#51cf66';
+                                if (mark >= 60) return '#a9e34b';
+                                if (mark >= 55) return '#ffd43b';
+                                if (mark >= 50) return '#ffa94d';
+                                if (mark >= 45) return '#ff922b';
+                                if (mark >= 40) return '#fa5252';
+                                return '#e03131';
+                            })
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { stepSize: 10 }
+                            }
+                        }
+                    }
                 });
             }
-
+        
             const termChartData = JSON.parse(document.getElementById("term-chart-data").textContent || "null");
             const yearChartData = JSON.parse(document.getElementById("year-chart-data").textContent || "null");
-
+        
             // === Term Line Chart ===
             const termCtx = document.getElementById('termLineChart')?.getContext('2d');
             if (termCtx && termChartData) {
@@ -310,34 +387,34 @@
                     }
                 });
             }
-
-
+        
             // === Year Line Chart ===
             const yearCtx = document.getElementById('yearLineChart')?.getContext('2d');
-                if (yearCtx && yearChartData) {
-                    new Chart(yearCtx, {
-                        type: 'line',
-                        data: {
-                            labels: yearChartData.labels,
-                            datasets: [{
-                                label: 'Class Average',
-                                data: yearChartData.data,
-                                borderColor: '#198754',
-                                backgroundColor: 'rgba(25,135,84,0.2)',
-                                tension: 0.3,
-                                fill: true
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: { legend: { display: false }},
-                            scales: {
-                                y: { beginAtZero: true, ticks: { precision: 0 } }
-                            }
+            if (yearCtx && yearChartData) {
+                new Chart(yearCtx, {
+                    type: 'line',
+                    data: {
+                        labels: yearChartData.labels,
+                        datasets: [{
+                            label: 'Class Average',
+                            data: yearChartData.data,
+                            borderColor: '#198754',
+                            backgroundColor: 'rgba(25,135,84,0.2)',
+                            tension: 0.3,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false }},
+                        scales: {
+                            y: { beginAtZero: true, ticks: { precision: 0 } }
                         }
-                    });
-                }
-            });
+                    }
+                });
+            }
+        });
     </script>
+        
 </body>
 </html>

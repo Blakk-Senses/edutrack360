@@ -1,118 +1,154 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Send Notification</title>
+    <title>Set deadline</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #1a202c;
-            color: white;
+            font-family: 'Calibri', sans-serif;
             margin: 0;
-            display: flex;
-            height: 100vh;
+            background-color: #e0f7fa;
+            padding-top: 50px; /* Ensures content doesn't overlap with navbar */
         }
-        .sidebar {
-            width: 250px;
-            background-color: #2d3748;
-            padding: 20px;
+
+        .navbar {
+            background-color: #003a3b;
+            color: white;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            padding: 10px 20px;
         }
-        .sidebar h2 {
-            color: #38b2ac;
-            font-size: 1.2rem;
+
+        .logo-img {
+            max-width: 120px;
+            height: auto;
         }
-        .sidebar ul {
-            list-style: none;
-            padding: 0;
-        }
-        .sidebar ul li {
-            padding: 10px 0;
-            color: #cbd5e0;
-        }
-        .sidebar ul .active {
-            color: #38b2ac;
-            font-weight: bold;
-        }
+
         .container {
-            flex: 1;
-            padding: 40px;
-        }
-        .box {
-            background-color: #2d3748;
+            margin-left: 100px;
+            margin-top: 60px;
             padding: 20px;
-            border-radius: 8px;
-            max-width: 400px;
         }
-        label {
-            display: block;
-            margin: 10px 0 5px;
+
+        .nav-pills .nav-link.active {
+            color: white !important;
         }
-        textarea {
-            width: 100%;
-            height: 80px;
-            padding: 8px;
-            background-color: #4a5568;
-            border: none;
-            border-radius: 4px;
-            color: white;
+        @media (max-width: 768px) {
+            .container {
+                margin-left: 60px;
+            }
         }
-        .radio-group {
-            margin: 10px 0;
-        }
-        .radio-group label {
-            display: flex;
-            align-items: center;
-        }
-        .radio-group input {
-            margin-right: 8px;
-        }
-        button {
-            width: 100%;
-            padding: 10px;
-            background-color: #38b2ac;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-        button:hover {
-            background-color: #319795;
+
+        @media (max-width: 480px) {
+            .container {
+                margin-left: 0px;
+            }
+            .logo-img {
+                max-width: 90px;
+                height: auto;
+            }
         }
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
-        <h2>FlippingBook</h2>
-        <ul>
-            <li>📄 Documents</li>
-            <li>🗑 Trash</li>
-            <li>🔒 Private Space</li>
-            <li>🌍 Public Space</li>
-            <li>📅 Events</li>
-            <li class="active">✉ Notifications</li>
-        </ul>
-    </div>
-
-    <div class="container">
-        <h2>Send Notification</h2>
-        <div class="box">
-            <h3>New Notification</h3>
-            <label for="message">Message</label>
-            <textarea id="message" placeholder="Enter your message"></textarea>
-
-            <label>Send to</label>
-            <div class="radio-group">
-                <label><input type="radio" name="sendTo" checked> Everyone</label>
-                <label><input type="radio" name="sendTo"> Authenticated users</label>
-                <label><input type="radio" name="sendTo"> Anonymous users</label>
-            </div>
-
-            <button>Send</button>
+    <div class="navbar">
+        <div class="logo">
+            <a href="{% url 'dashboards:cis_dashboard' %}" class="href">
+                <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
+            </a>
         </div>
     </div>
+    <div class="container mt-5">
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <h3 class="mb-4 text-secondary fw-bold">
+                <i class="bi bi-calendar-check me-2"></i>Set Result Upload Deadline
+            </h3>
 
+            <form id="set-deadline-form" method="POST" action="{% url 'cis:set_result_upload_deadline' %}">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label for="academic_year" class="form-label fw-semibold">Academic Year</label>
+                    <select id="academic_year" name="academic_year" class="form-select form-select-lg" required>
+                        <option value="" disabled selected>Select Academic Year</option>
+                        {% for year in available_years %}
+                            <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="term" class="form-label fw-semibold">Term</label>
+                    <select id="term" name="term" class="form-select form-select-lg" required>
+                        <option value="" disabled selected>Select Term</option>
+                        {% for t in available_terms %}
+                            <option value="{{ t }}" {% if t == selected_term %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="deadline_date" class="form-label fw-semibold">Deadline Date</label>
+                    <input type="date" id="deadline_date" name="deadline_date" class="form-control form-control-lg" required>
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-save me-2"></i>Set Deadline
+                    </button>
+                </div>
+            </form>
+
+            <div id="form-response" class="mt-4"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Include Bootstrap Icons (optional but used above) -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+<script>
+    document.getElementById("set-deadline-form").addEventListener("submit", function(event) {
+        event.preventDefault();
+
+        const formData = new FormData(this);
+        const csrfToken = document.querySelector('[name="csrfmiddlewaretoken"]').value;
+
+        fetch("{% url 'cis:set_result_upload_deadline' %}", {
+            method: "POST",
+            body: formData,
+            headers: {
+                "X-CSRFToken": csrfToken
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            const responseContainer = document.getElementById("form-response");
+            responseContainer.innerHTML = `
+                <div class="alert alert-${data.success ? 'success' : 'danger'}" role="alert">
+                    ${data.message}
+                </div>`;
+        })
+        .catch(error => {
+            document.getElementById("form-response").innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    An error occurred. Please try again later.
+                </div>`;
+        });
+    });
+</script>
+
+    
+    
+    
 </body>
 </html>

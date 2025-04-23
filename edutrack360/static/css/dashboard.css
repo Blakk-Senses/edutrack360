@@ -2,7 +2,6 @@ body {
     font-family: 'Calibri', sans-serif;
     margin: 0;
     background-color: #e0f7fa; /* Light shade of teal */
-    overflow: hidden; /* Prevent scrollbar on body */
 }
 
 .navbar {
@@ -19,17 +18,17 @@ body {
     top: 0;
 }
 .navbar i {
-    font-size: 1.2rem; /* Adjust size as needed */
+    font-size: 1.0rem; /* Adjust size as needed */
 }
 
 .sidebar a i {
-    font-size: 1.5rem; /* Adjust size as needed */
+    font-size: 1.3rem; /* Adjust size as needed */
 }
 
 
 .sidebar {
     height: calc(100vh - 60px); /* Sidebar starts below navbar */
-    width: 100px;
+    width: 80px;
     background-color: #004d40; /* Dark teal */
     position: fixed;
     top: 60px; /* Start right below navbar */
@@ -37,7 +36,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center; /* Center items horizontally */
-    padding-top: 20px;
+    padding-top: 15px;
     color: white;
     transition: width 0.5s; /* Smooth transition for width change */
     z-index: 900; /* Ensure it's below navbar */
@@ -79,6 +78,8 @@ body {
 .sidebar a.logout-link .tooltip::before {
     border-color: transparent red transparent transparent; /* Red arrow for logout */
 }
+
+
 /* Hover effect */
 .sidebar a:hover {
     background-color: rgba(255, 255, 255, 0.1);
@@ -125,7 +126,7 @@ body {
 /* Adjust main content margin */
 .main-content {
     margin-left: 110px; /* Adjusted for sidebar width */
-    margin-top: 70px; /* Adjusted for navbar height */
+    margin-top: 60px; /* Adjusted for navbar height */
     padding: 20px;
     height: calc(100vh - 70px);
     overflow-y: auto;
@@ -138,12 +139,12 @@ body {
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
     .sidebar {
-        width: 80px; /* Smaller sidebar for mobile */
+        width: 40px; /* Smaller sidebar for mobile */
     }
 
     .main-content {
-        margin-left: 90px;
-        margin-top: 70px;
+        margin-left: 30px;
+        margin-top: 50px;
     }
 }
 
@@ -155,6 +156,10 @@ body {
     overflow: hidden;
     position: relative;
     z-index: 100; /* Ensure tooltips go over cards */
+}
+
+.dashboard-header{
+    margin-bottom: 10px;
 }
 
 .custom-card .card-header {
@@ -200,36 +205,6 @@ body {
     min-height: 100px;
 }
 
-/* Assigning both border and text color */
-.total-students-assessed {
-    border-left-color: #22027c; /* Green */
-    color: #22027c;
-}
-
-.average-class-performance {
-    border-left-color: #17A2B8; /* Cyan */
-    color: #17A2B8;
-}
-
-.best-performing-students {
-    border-left-color: #28A745; /* Green */
-    color: #28A745;
-}
-
-.weakest-performing-students {
-    border-left-color: #DC3545; /* Red */
-    color: #DC3545;
-}
-
-.top-performing-subject {
-    border-left-color: #6002b7; /* Purple */
-    color: #6002b7;
-}
-.bottom-performing-subject {
-    border-left-color: #d96003; /* Purple */
-    color: #d96003;
-}
-
 .navbar {
     display: flex;
     justify-content: space-between;
@@ -248,14 +223,14 @@ body {
 /* Responsive Logo Resizing */
 @media (max-width: 768px) {
     .logo-img {
-        max-width: 100px;
+        max-width: 110px;
         
     }
 }
 
 @media (max-width: 480px) {
     .logo-img {
-        max-width: 80px;
+        max-width: 90px;
         
     }
 }
@@ -275,7 +250,7 @@ body {
 
 /* Adjust spacing for smaller screens */
 @media (max-width: 480px) {
-    .welcome-text {
+    .navbar-icons .fas{
         font-size: 14px;
     }
 }
@@ -285,3 +260,184 @@ body {
     align-items: center;
     gap: 20px; /* Adjust spacing */
 }
+
+.navbar-icons .fas{
+    font-size: 22px;
+}
+
+.user-dropdown {
+    width: 200px;
+    background: #f0ffff;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    z-index: 99999;
+}
+
+.user-dropdown ul {
+    margin: 0;
+    padding: 0;
+}
+
+.user-dropdown .dropdown-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.user-dropdown .dropdown-item:hover {
+    background-color: #f1f1f1;
+}
+
+.user-dropdown .dropdown-item.active {
+    background-color: #02776a;
+    color: white;
+}
+
+.user-dropdown .dropdown-item.logout {
+    border-top: 1px solid #eee;
+    font-weight: bold;
+}
+
+.notification-container {
+    position: relative;
+    display: inline-block;
+}
+.user-dropdown .dropdown-item a {
+    display: block;
+    width: 100%;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.user-dropdown .dropdown-item a:hover {
+    background-color: #f1f1f1;
+}
+
+
+.btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    position: relative;
+}
+
+@media (max-width: 768px) {
+    .dashboard-card .value,
+    .recent-upload .value {
+        font-size: 18px;
+    }
+
+    .dashboard-card .icon {
+        font-size: 26px;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-card .value{
+        font-size: 14px;
+    }
+    .recent-upload .value{
+        font-size: 10px;
+    }
+
+    .dashboard-card .icon {
+        font-size: 18px;
+    }
+}
+
+@media (max-width: 480px) {
+    .welcome-text {
+        display: none;
+    }
+}
+/* Limit modal width on larger screens */
+.custom-modal {
+    max-width: 400px;
+    margin: auto;
+}
+
+/* On smaller screens, let it take full width */
+@media (max-width: 576px) {
+    .custom-modal {
+        max-width: 90%;
+    }
+}
+@media (max-width: 480px) {
+    .custom-modal {
+        max-width: 80%;
+    }
+}
+
+/* Base style for both buttons */
+.custom-btn {
+    background-color: #f8f9fa;      /* soft light gray */
+    color: #6c757d;
+    position: center;                 /* muted text */
+    border: 1px solid #ced4da;
+    padding: 0.5rem 0.75rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+/* Hover effect for both */
+.custom-btn:hover {
+    background-color: #025e5c;
+    color: #ffffff;
+}
+
+/* Red version for logout */
+.danger-btn {
+    background-color: #f8d7da;      /* light red bg */
+    color: #842029;                 /* Bootstrap danger text */
+    border: 1px solid #f5c2c7;
+}
+
+.danger-btn:hover {
+    background-color: #b90316;
+    color: #f6efef;
+}
+
+/* Ensure proper spacing on small screens */
+@media (max-width: 576px) {
+    .modal .btn {
+        font-size: 1rem;
+    }
+
+    .modal .d-flex {
+        flex-wrap: nowrap;
+    }
+    .custom-btn {
+        background-color: #025e5c;
+        color: #ffffff;
+    }
+    .danger-btn {
+        background-color: #b90316;
+        color: #f6efef;
+    }
+}
+
+#deadlineAlert {
+    transition: opacity 0.5s ease-in-out;
+    opacity: 1;
+}
+
+/* Flashing effect */
+#deadlineAlert.flashing {
+    animation: flashBlink 1s infinite;
+}
+
+@keyframes flashBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* Custom fade-out */
+#deadlineAlert.custom-fade-out {
+    opacity: 0;
+    transition: opacity 1s ease-out;
+}
+
+
+

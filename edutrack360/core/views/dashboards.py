@@ -1,17 +1,18 @@
 
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.contrib.auth import get_user_model
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from core.models import (
-    District, Teacher, PerformanceSummary, Profile, 
-    School, SchoolSubmission, Circuit, StudentMark, Result, SubjectTeacher, 
-    ClassTeacher, Subject, Student
+    ResultUploadDeadline, School, StudentMark, 
+    Result, SubjectTeacher, ClassTeacher,
 )
+from django.contrib import messages
+from datetime import timedelta
+from django.utils import timezone
 import json
 from decimal import Decimal
-from django.db.models import Avg, Count, Max
-from django.http import HttpResponse
+from django.db.models import Avg
 from django.urls import reverse_lazy
 
 
@@ -22,6 +23,60 @@ User = get_user_model()
 @login_required
 def admin_dashboard(request):
     return render(request, 'admin_dashboard.html')
+
+def cis_registration(request):
+    if not request.user.is_authenticated or request.user.role != 'admin':
+        return HttpResponseForbidden("You don't have permission to access this page.")
+    
+    admin_user = request.user
+    district = admin_user.district
+
+    # Handling form submission
+    if request.method == "POST":
+        staff_id = request.POST.get('staff_id')
+        license_number = request.POST.get('license_number')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        email = request.POST.get('email')
+        phone_number = request.POST.get('phone_number', '')
+        password1 = request.POST.get('password1')
+        password2 = request.POST.get('password2')
+
+        # Check if passwords match
+        if password1 != password2:
+            messages.error(request, "Passwords do not match.")
+            return redirect('cis_registration')
+
+        # Check if CIS is already assigned to the district
+        if User.objects.filter(role='cis', district=district).exists():
+            messages.error(request, "A CIS user is already assigned to this district.")
+            return redirect('cis_registration')
+
+        # Create the new CIS user
+        user = User.objects.create_user(
+            staff_id=staff_id,
+            license_number=license_number,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            phone_number=phone_number,
+            password=password1,
+            role='cis',  # fixed to 'cis'
+            district=district,
+        )
+        
+        # assign the user
+        district.cis = user
+        district.save()
+
+
+        # Successful creation message
+        messages.success(request, "CIS user registered successfully.")
+        return redirect('dashboards:cis_registration')  # Redirect to your desired page
+
+    # Rendering the registration form (GET request)
+    return render(request, 'dashboards/cis_registration.html', {'district': district})
+
 
 #------------ CIS DASHBOARD -----------------------
 
@@ -298,6 +353,29 @@ def siso_dashboard(request):
         if entry["school__headteacher__first_name"] and entry["school__headteacher__last_name"]
     ]
 
+    
+    # 🎯 Get the current result upload deadline for the school district
+    deadline_obj = ResultUploadDeadline.objects.filter(district=circuit.district).first()
+
+    # Prepare deadline status
+    if deadline_obj:
+        deadline_date = deadline_obj.deadline_date
+        time_remaining = deadline_date - timezone.now().date()
+
+        # Set color based on the remaining time
+        if time_remaining <= timedelta(days=14):
+            notification_color = "danger"  # Red background for urgent deadlines
+        else:
+            notification_color = "info"  # Teal/Blue for other cases
+
+        deadline_status = {
+            "status": notification_color,
+            "message": f"Result upload deadline is {time_remaining.days} days away.",
+            "deadline_date": deadline_date,
+        }
+    else:
+        deadline_status = None
+
     # Handle AJAX request correctly
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse({
@@ -311,6 +389,8 @@ def siso_dashboard(request):
             "weakest_performing_subjects": weakest_performing_subjects,
             "performance_trends": trend_data,
             "notifications": formatted_notifications,
+            "deadline_status": deadline_status,
+            "time_remaining": time_remaining.days if deadline_obj else None
         })
 
     # Pass selected filters back to the template
@@ -329,6 +409,7 @@ def siso_dashboard(request):
         "weakest_performing_subjects": weakest_performing_subjects,
         "performance_trends": trend_data,
         "notifications": formatted_notifications,
+        "deadline_status": deadline_status,
     })
 
 
@@ -368,11 +449,8 @@ def headteacher_dashboard(request):
         })
 
     # 🎯 Filter marks school-wide by selected filters
-    marks_qs = StudentMark.objects.filter(
-        student__school=school,
-        academic_year=selected_year,
-        term=selected_term
-    )
+    marks_qs = StudentMark.objects.select_related('student', 'subject', 'class_group') \
+                                    .filter(student__school=school, academic_year=selected_year, term=selected_term)
 
     total_students_assessed = marks_qs.values("student").distinct().count()
     total_school_average = marks_qs.aggregate(avg=Avg("mark"))["avg"] or 0
@@ -407,22 +485,56 @@ def headteacher_dashboard(request):
         for entry in class_performance_trends
     ]
 
-    result_uploads = (
-        Result.objects.filter(
+    upload_entries = (
+        Result.objects
+        .filter(
             school=school,
             academic_year=selected_year,
             term=selected_term
         )
-        .select_related("teacher", "subject", "class_group")
-        .order_by("-id")[:10]
+        .values(
+            "teacher__first_name",
+            "teacher__last_name",
+            "subject__name",
+            "class_group__name",
+            "term",
+            "academic_year"
+        )
+        .distinct()
+        .order_by("-academic_year", "-term")[:10]
     )
 
     notifications = [
-        f"{upload.teacher.first_name} {upload.teacher.last_name} uploaded {upload.subject.name} for {upload.class_group.name}"
-        for upload in result_uploads
+        f"{entry['teacher__first_name']} {entry['teacher__last_name']} uploaded {entry['subject__name']} for {entry['class_group__name']} ({entry['term']} {entry['academic_year']})"
+        for entry in upload_entries
+        if entry["teacher__first_name"] and entry["teacher__last_name"]
     ]
 
 
+    # 🎯 Get the current result upload deadline for the school district
+    deadline_obj = ResultUploadDeadline.objects.filter(district=school.district).first()
+
+    # Prepare deadline status
+    if deadline_obj:
+        deadline_date = deadline_obj.deadline_date
+        time_remaining = deadline_date - timezone.now().date()
+
+        # Set color based on the remaining time
+        if time_remaining <= timedelta(days=14):
+            notification_color = "danger"  # Red background for urgent deadlines
+        else:
+            notification_color = "info"  # Teal/Blue for other cases
+
+        deadline_status = {
+            "status": notification_color,
+            "message": f"Result upload deadline is {time_remaining.days} days away.",
+            "deadline_date": deadline_date,
+        }
+    else:
+        deadline_status = None
+
+
+    # Return AJAX response if requested
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse({
             "total_students_assessed": total_students_assessed,
@@ -439,6 +551,8 @@ def headteacher_dashboard(request):
             ],
             "performance_trends": trend_data,
             "notifications": notifications,
+            "deadline_status": deadline_status,
+            "time_remaining": time_remaining.days if deadline_obj else None
         })
 
     return render(request, "dashboards/headteacher_dashboard.html", {
@@ -454,8 +568,8 @@ def headteacher_dashboard(request):
         "best_performing_classes": best_performing_classes,
         "performance_trends": trend_data,
         "notifications": notifications,
+        "deadline_status": deadline_status,
     })
-
 
 #------------ TEACHER DASHBOARDS -----------------------
 @login_required
@@ -556,6 +670,28 @@ def class_teacher_dashboard(request):
         if isinstance(trend.get("avg_mark"), Decimal):
             trend["avg_mark"] = float(trend["avg_mark"])
 
+    # 🎯 Get the current result upload deadline for the school district
+    deadline_obj = ResultUploadDeadline.objects.filter(district=teacher.school.district).first()
+
+    # Prepare deadline status
+    if deadline_obj:
+        deadline_date = deadline_obj.deadline_date
+        time_remaining = deadline_date - timezone.now().date()
+
+        # Set color based on the remaining time
+        if time_remaining <= timedelta(days=14):
+            notification_color = "danger"  # Red background for urgent deadlines
+        else:
+            notification_color = "info"  # Teal/Blue for other cases
+
+        deadline_status = {
+            "status": notification_color,
+            "message": f"Result upload deadline is {time_remaining.days} days away.",
+            "deadline_date": deadline_date,
+        }
+    else:
+        deadline_status = None
+
 
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return JsonResponse({
@@ -582,6 +718,8 @@ def class_teacher_dashboard(request):
                 "avg_mark": round(lowest_subjects[0]["avg_mark"], 2)
             } if lowest_subjects else None,
             "performance_trends": list(performance_trends),
+            "deadline_status": deadline_status,
+            "time_remaining": time_remaining.days if deadline_obj else None
         })
 
     return render(request, "dashboards/class_teacher_dashboard.html", {
@@ -590,6 +728,7 @@ def class_teacher_dashboard(request):
         "terms": all_terms,
         "selected_year": selected_year,
         "selected_term": selected_term,
+        "deadline_status": deadline_status,
     })
 
 
@@ -672,6 +811,28 @@ def subject_teacher_dashboard(request):
         else:
             score_buckets["0-39"] += 1
 
+        
+    # 🎯 Get the current result upload deadline for the school district
+    deadline_obj = ResultUploadDeadline.objects.filter(district=teacher.school.district).first()
+
+    # Prepare deadline status
+    if deadline_obj:
+        deadline_date = deadline_obj.deadline_date
+        time_remaining = deadline_date - timezone.now().date()
+
+        # Set color based on the remaining time
+        if time_remaining <= timedelta(days=14):
+            notification_color = "danger"  # Red background for urgent deadlines
+        else:
+            notification_color = "info"  # Teal/Blue for other cases
+
+        deadline_status = {
+            "status": notification_color,
+            "message": f"Result upload deadline is {time_remaining.days} days away.",
+            "deadline_date": deadline_date,
+        }
+    else:
+        deadline_status = None
 
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return JsonResponse({
@@ -680,6 +841,8 @@ def subject_teacher_dashboard(request):
             "best_students": [{"name": f"{s['student__first_name']} {s['student__last_name']}", "mark": s["avg_mark"]} for s in best_students],
             "weakest_students": [{"name": f"{s['student__first_name']} {s['student__last_name']}", "mark": s["avg_mark"]} for s in weakest_students],
             "performance_distribution": score_buckets,
+            "deadline_status": deadline_status,
+            "time_remaining": time_remaining.days if deadline_obj else None
         })
 
     return render(request, "dashboards/subject_teacher_dashboard.html", {
@@ -691,6 +854,7 @@ def subject_teacher_dashboard(request):
         "academic_years": valid_years,
         "selected_year": academic_year,
         "selected_term": selected_term,
+        "deadline_status": deadline_status,
     })
 
 

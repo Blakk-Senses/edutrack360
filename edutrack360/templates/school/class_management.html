@@ -40,6 +40,84 @@
         .nav-pills .nav-link.active {
             color: white !important;
         }
+        @media (max-width: 768px) {
+            .nav-pills .nav-link {
+                font-size: 14px;
+                padding: 6px 10px;
+                margin: 0 4px;
+            }
+
+            .nav-pills .nav-link i {
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin-left: 0px;
+            }
+            .nav-pills .nav-link {
+                font-size: 12px;
+                padding: 4px 8px;
+                margin: 0 2px;
+            }
+
+            .nav-pills .nav-link i {
+                font-size: 12px;
+            }
+        }
+        @media (max-width: 768px) {
+            .tab-content .tab-pane {
+                padding: 15px;
+            }
+
+            .tab-content h4 {
+                font-size: 18px;
+            }
+
+            .form-control {
+                font-size: 14px;
+                padding: 8px 10px;
+            }
+
+            .btn {
+                font-size: 14px;
+                padding: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .tab-content .tab-pane {
+                padding: 10px;
+            }
+
+            .tab-content h4 {
+                font-size: 16px;
+            }
+
+            .form-control {
+                font-size: 13px;
+                padding: 6px 8px;
+            }
+
+            .btn {
+                font-size: 13px;
+                padding: 8px;
+            }
+        }
+        @media (max-width: 768px) {
+            .logo-img {
+                max-width: 80px;
+                
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo-img {
+                max-width: 80px;
+                
+            }
+        }
     </style>
 </head>
 <body>
@@ -57,7 +135,7 @@
         <ul class="nav nav-pills justify-content-center mb-4" id="teacherTabs">
             <li class="nav-item">
                 <a class="nav-link fw-bold text-success" id="addClass-tab" data-bs-toggle="pill" href="#addClass" role="tab">
-                    <i class="fas fa-plus-circle me-1"></i> Add Class to Department
+                    <i class="fas fa-plus-circle me-1"></i> Add Class
                 </a>
             </li>
             <li class="nav-item">
@@ -293,12 +371,12 @@
         function removeTeacher() {
             let teacher = document.getElementById("remove-teacher").value;
             let classId = document.getElementById("remove-class").value;
-        
+
             if (!teacher || !classId) {
                 showModal("All fields are required.");
                 return;
             }
-        
+
             fetch(window.SCHOOL_URLS.removeTeacherFromClass, {
                 method: "POST",
                 headers: {
@@ -307,12 +385,21 @@
                 },
                 body: `remove-teacher=${teacher}&remove-class=${classId}`
             })
-            .then(response => response.json())
-            .then(data => {
-                showModal(data.message || data.error);
-                loadTeachers();
+            .then(response => response.text())
+            .then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    showModal(data.message || data.error);
+                    loadTeachers(); // Refresh list if needed
+                } catch (e) {
+                    console.error("Non-JSON response:", text);
+                    showModal("Something went wrong. Try again or check logs.");
+                }
             })
-            .catch(error => console.error("Error removing teacher:", error));
+            .catch(error => {
+                console.error("Error removing teacher:", error);
+                showModal("Error communicating with server.");
+            });
         }
         
         function addClassToDepartment() {
@@ -350,8 +437,5 @@
             return document.cookie.split('; ').find(row => row.startsWith('csrftoken=')).split('=')[1];
         }
     </script>
-        
-    
-
 </body>
 </html>
