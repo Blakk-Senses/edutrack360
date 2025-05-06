@@ -261,71 +261,78 @@
     <!-- 📊 Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-    document.addEventListener("DOMContentLoaded", () => {
+        document.addEventListener("DOMContentLoaded", () => {
         // ➕ Line Charts for term/year trends
-        document.querySelectorAll("script[id^='term-chart-data-']").forEach(script => {
-            const suffix = script.id.split("term-chart-data-")[1];
-            try {
-                const termData = JSON.parse(script.textContent);
-                const ctx = document.getElementById(`termLineChart_${suffix}`)?.getContext("2d");
-                if (ctx && termData.labels && termData.data) {
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: termData.labels,
-                            datasets: [{
-                                label: 'Average',
-                                data: termData.data,
-                                borderColor: '#0d6efd',
-                                backgroundColor: 'rgba(13,110,253,0.2)',
-                                fill: true,
-                                tension: 0.3
-                            }]
-                        },
-                        options: {
-                            plugins: { legend: { display: false } },
-                            scales: { y: { beginAtZero: true } }
-                        }
-                    });
-                } else {
-                    console.warn("Invalid term chart data", termData);
+            document.querySelectorAll("script[id^='term-chart-data-']").forEach(script => {
+                const suffix = script.id.split("term-chart-data-")[1];
+                console.log(`Processing term chart data for suffix: ${suffix}`);
+                try {
+                    const termData = JSON.parse(script.textContent);
+                    console.log('Term Data:', termData);  // Debug log to verify data
+                    const ctx = document.getElementById(`termLineChart_${suffix}`)?.getContext("2d");
+                    if (ctx && termData.labels && termData.data) {
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: termData.labels,
+                                datasets: [{
+                                    label: 'Average',
+                                    data: termData.data,
+                                    borderColor: '#0d6efd',
+                                    backgroundColor: 'rgba(13,110,253,0.2)',
+                                    fill: true,
+                                    tension: 0.3
+                                }]
+                            },
+                            options: {
+                                plugins: { legend: { display: false } },
+                                scales: { y: { beginAtZero: true } }
+                            }
+                        });
+                    } else {
+                        console.warn("Invalid term chart data", termData);
+                    }
+                } catch (e) {
+                    console.error("Error rendering term chart", e);
                 }
-            } catch (e) {
-                console.error("Error rendering term chart", e);
-            }
+            });
+
+            // Similarly for year charts
+            document.querySelectorAll("script[id^='year-chart-data-']").forEach(script => {
+                const suffix = script.id.split("year-chart-data-")[1];
+                console.log(`Processing year chart data for suffix: ${suffix}`);
+                try {
+                    const yearData = JSON.parse(script.textContent);
+                    console.log('Year Data:', yearData);  // Debug log to verify data
+                    const ctx = document.getElementById(`yearLineChart_${suffix}`)?.getContext("2d");
+                    if (ctx && yearData.labels && yearData.data) {
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: yearData.labels,
+                                datasets: [{
+                                    label: 'Average',
+                                    data: yearData.data,
+                                    borderColor: '#198754',
+                                    backgroundColor: 'rgba(25,135,84,0.2)',
+                                    fill: true,
+                                    tension: 0.3
+                                }]
+                            },
+                            options: {
+                                plugins: { legend: { display: false } },
+                                scales: { y: { beginAtZero: true } }
+                            }
+                        });
+                    } else {
+                        console.warn("Invalid year chart data", yearData);
+                    }
+                } catch (e) {
+                    console.error("Error rendering year chart", e);
+                }
+            });
         });
 
-        document.querySelectorAll("script[id^='year-chart-data-']").forEach(script => {
-            const suffix = script.id.split("year-chart-data-")[1];
-            try {
-                const yearData = JSON.parse(script.textContent);
-                const ctx = document.getElementById(`yearLineChart_${suffix}`)?.getContext("2d");
-                if (ctx && yearData.labels && yearData.data) {
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: yearData.labels,
-                            datasets: [{
-                                label: 'Average',
-                                data: yearData.data,
-                                borderColor: '#198754',
-                                backgroundColor: 'rgba(25,135,84,0.2)',
-                                fill: true,
-                                tension: 0.3
-                            }]
-                        },
-                        options: {
-                            plugins: { legend: { display: false } },
-                            scales: { y: { beginAtZero: true } }
-                        }
-                    });
-                } else {
-                    console.warn("Invalid year chart data", yearData);
-                }
-            } catch (e) {
-                console.error("Error rendering year chart", e);
-            }
-        });
 
         // 🎯 Clustered Bar Charts per Department
         document.querySelectorAll("script[id^='bar-data-']").forEach(script => {
@@ -364,12 +371,7 @@
                 });
             }
         });
-    });
     </script>
-
-    
-    
-    
 </body>
 </html>    
     

@@ -136,165 +136,191 @@
     
         <!-- 📊 Department Performance Tables and Charts -->
         {% for school, school_data in school_departments.items %}
-        <div class="card shadow-sm border-0 mb-5">
-            <div class="card-body">
-                <h5 class="card-title text-black">{{ school }}</h5>
-
-                {% for dept, dept_data in school_data.items %}
-                    <div class="card shadow-sm border-0 mb-5">
-                        <div class="card-body">
-                            <h5 class="card-title text-secondary">{{ dept }}</h5>
-
-                            {% with all_classes=dept_data.all_classes %}
-                            <table class="table table-bordered table-hover text-center mt-3 responsive-shrink-table">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Subject</th>
-                                        {% for class_name in all_classes %}
-                                            <th>{{ class_name }}</th>
-                                        {% endfor %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for subject, class_data in dept_data.subjects.items %}
+            <div class="card shadow-sm border-0 mb-5">
+                <div class="card-body">
+                    <h4 class="card-title text-black">{{ school }}</h4>
+    
+                    {% for dept, dept_data in school_data.items %}
+                        <div class="card shadow-sm border-0 mb-5">
+                            <div class="card-body">
+                                <h5 class="card-title text-secondary">{{ dept }}</h5>
+    
+                                {% with all_classes=dept_data.all_classes %}
+                                <table class="table table-bordered table-hover text-center mt-3 responsive-shrink-table">
+                                    <thead class="table-light">
                                         <tr>
-                                            <td class="fw-semibold text-start">{{ subject }}</td>
+                                            <th>Subject</th>
                                             {% for class_name in all_classes %}
-                                                <td>{{ class_data|get_item:class_name|default:"-" }}</td>
+                                                <th>{{ class_name }}</th>
                                             {% endfor %}
                                         </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                            {% endwith %}
-
-                            <!-- 📊 Clustered Bar Chart -->
-                            <canvas id="barChart_{{ dept|slugify }}" height="120"></canvas>
-                            {% with dept_slug=dept|slugify %}
-                                {% with bar_data_id="bar-data-"|add:dept_slug %}
-                                    {{ dept_data.subjects|json_script:bar_data_id }}
+                                    </thead>
+                                    <tbody>
+                                        {% for subject, class_data in dept_data.subjects.items %}
+                                            <tr>
+                                                <td class="fw-semibold text-start">{{ subject }}</td>
+                                                {% for class_name in all_classes %}
+                                                    <td>{{ class_data|get_item:class_name|default:"-" }}</td>
+                                                {% endfor %}
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
                                 {% endwith %}
-                                {% with bar_classes_id="bar-classes-"|add:dept_slug %}
-                                    {{ dept_data.all_classes|json_script:bar_classes_id }}
+    
+                                <!-- 📊 Clustered Bar Chart -->
+                                <canvas id="barChart_{{ dept|slugify }}" height="120"></canvas>
+                                {% with dept_slug=dept|slugify %}
+                                    {% with bar_data_id="bar-data-"|add:dept_slug %}
+                                        {{ dept_data.subjects|json_script:bar_data_id }}
+                                    {% endwith %}
+                                    {% with bar_classes_id="bar-classes-"|add:dept_slug %}
+                                        {{ dept_data.all_classes|json_script:bar_classes_id }}
+                                    {% endwith %}
                                 {% endwith %}
-                            {% endwith %}
+                            </div>
                         </div>
-                    </div>
-                {% endfor %}
+                    {% endfor %}
+                </div>
             </div>
-        </div>
         {% endfor %}
+    <!-- 📈 Per-School Term Performance with Circuit Average Row -->
+            <div class="card shadow-sm border-0 mb-5">
+                <div class="card-body">
+                    <h5 class="card-title text-secondary">Per-School Term Performance</h5>
+                    <table class="table table-bordered table-hover text-center mt-3 responsive-shrink-table">
+                        <thead class="table-light">
+                            <tr>
+                                {% for key in school_term_trends.0.keys %}
+                                    <th>{{ key }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in school_term_trends %}
+                            <tr>
+                                {% for val in row.values %}
+                                    <td>{{ val }}</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                            <tr class="fw-bold text-primary">
+                                {% for val in term_trend.values %}
+                                    <td>{{ val }}</td>
+                                {% endfor %}
+                            </tr>
+                        </tbody>
+                    </table>
+                    <canvas id="termTrendChart" height="300"></canvas>
+                </div>
+            </div>
 
-        <!-- 📈 Term Trend -->
-        <div class="card shadow-sm border-0 mb-5">
-        <div class="card-body">
-            <h5 class="card-title text-secondary">Term Performance Trend (Circuit)</h5>
-            <table class="table table-bordered table-hover text-center mt-3 responsive-shrink-table">
-                <thead class="table-light">
-                    <tr>
-                        {% for key in term_trend.keys %}
-                            <th>{{ key }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        {% for val in term_trend.values %}
-                            <td>{{ val }}</td>
-                        {% endfor %}
-                    </tr>
-                </tbody>
-            </table>
-            <canvas id="termLineChart" height="100"></canvas>
-        </div>
-        </div>
-        {{ term_chart|json_script:"term-chart-data" }}
+            <!-- 📆 Academic Year Trend (Schools + Circuit) -->
+            <div class="card shadow-sm border-0 mb-5">
+                <div class="card-body">
+                    <h5 class="card-title text-secondary">Academic Year Trend</h5>
+                    <canvas id="yearTrendChart" height="300"></canvas>
+                </div>
+            </div>
 
-        <!-- 📆 Academic Year Trend -->
-        <div class="card shadow-sm border-0 mb-5">
-        <div class="card-body">
-            <h5 class="card-title text-secondary">Academic Year Trend (Circuit)</h5>
-            <table class="table table-bordered table-hover text-center mt-3 responsive-shrink-table">
-                <thead class="table-light">
-                    <tr>
-                        {% for key in academic_trend.keys %}
-                            <th>{{ key }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        {% for val in academic_trend.values %}
-                            <td>{{ val }}</td>
-                        {% endfor %}
-                    </tr>
-                </tbody>
-            </table>
-            <canvas id="yearLineChart" height="100"></canvas>
-        </div>
-        </div>
-        {{ year_chart|json_script:"year-chart-data" }}
+            <!-- JSON Script for Term and Year Charts -->
+            {{ term_chart|json_script:"term-chart-data" }}
+            {{ year_chart|json_script:"year-chart-data" }}
 
-        <div class="shadow-sm border rounded px-4 py-3 mt-4">
-            <a href="{% url 'siso:download_circuit_performance_pdf' %}?academic_year={{ selected_year }}&term={{ selected_term }}"
-            class="btn btn-outline-primary w-100">
-                ⬇️ Download PDF Report
-            </a>
+            <div class="shadow-sm border rounded px-4 py-3 mt-4">
+                <a href="{% url 'siso:download_circuit_performance_pdf' %}?academic_year={{ selected_year }}&term={{ selected_term }}"
+                class="btn btn-outline-primary w-100">
+                    ⬇️ Download PDF Report
+                </a>
+            </div>
         </div>
     </div>
 
-        <!-- 📊 Chart.js -->
+    <!-- 📊 Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
+            // Helper to generate distinct colors for each dataset
+            const generateColor = (index) => {
+                const hue = (index * 45) % 360;
+                return `hsl(${hue}, 70%, 50%)`;
+            };
+
+            // Parse the chart data passed from Django template
             const termChartData = JSON.parse(document.getElementById("term-chart-data")?.textContent || "null");
             const yearChartData = JSON.parse(document.getElementById("year-chart-data")?.textContent || "null");
 
-            if (termChartData) {
-                const ctx = document.getElementById('termLineChart').getContext('2d');
+            // 🎯 TERM TREND: Multiple lines for schools + circuit
+            if (termChartData && termChartData.datasets && termChartData.labels) {
+                const ctx = document.getElementById('termTrendChart').getContext('2d');
                 new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: termChartData.labels,
-                        datasets: [{
-                            label: 'Average',
-                            data: termChartData.data,
-                            borderColor: '#0d6efd',
-                            backgroundColor: 'rgba(13,110,253,0.2)',
-                            fill: true,
-                            tension: 0.3
-                        }]
+                        datasets: termChartData.datasets.map((dataset, i) => ({
+                            label: dataset.label,
+                            data: dataset.data,
+                            borderColor: generateColor(i),
+                            backgroundColor: generateColor(i) + '40',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            borderWidth: 2
+                        }))
                     },
                     options: {
-                        plugins: { legend: { display: false } },
-                        scales: { y: { beginAtZero: true } }
+                        responsive: true,
+                        plugins: {
+                            title: { display: true, text: 'Term-wise Performance Trend' },
+                            legend: { display: true, position: 'bottom' },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Average (%)' }
+                            }
+                        }
                     }
                 });
             }
 
-            if (yearChartData) {
-                const ctx = document.getElementById('yearLineChart').getContext('2d');
+            // 📆 YEARLY TREND: Multiple lines for schools + circuit
+            if (yearChartData && yearChartData.datasets && yearChartData.labels) {
+                const ctx = document.getElementById('yearTrendChart').getContext('2d');
                 new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: yearChartData.labels,
-                        datasets: [{
-                            label: 'Average',
-                            data: yearChartData.data,
-                            borderColor: '#198754',
-                            backgroundColor: 'rgba(25,135,84,0.2)',
-                            fill: true,
-                            tension: 0.3
-                        }]
+                        datasets: yearChartData.datasets.map((dataset, i) => ({
+                            label: dataset.label,
+                            data: dataset.data,
+                            borderColor: generateColor(i + 100),
+                            backgroundColor: generateColor(i + 100) + '40',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            borderWidth: 2
+                        }))
                     },
                     options: {
-                        plugins: { legend: { display: false } },
-                        scales: { y: { beginAtZero: true } }
+                        responsive: true,
+                        plugins: {
+                            title: { display: true, text: 'Academic Year Performance Trend' },
+                            legend: { display: true, position: 'bottom' },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Average (%)' }
+                            }
+                        }
                     }
                 });
             }
 
-            // 🎯 Clustered Bar Charts per Department
+            // 📊 Clustered Bar Charts (unchanged from your original)
             document.querySelectorAll("script[id^='bar-data-']").forEach(script => {
                 const deptKey = script.id.replace("bar-data-", "");
                 const data = JSON.parse(script.textContent);
@@ -304,7 +330,7 @@
                 const datasets = classes.map((cls, i) => ({
                     label: cls,
                     data: subjects.map(subject => data[subject][cls] || 0),
-                    backgroundColor: `hsl(${(i * 60) % 360}, 70%, 60%)`
+                    backgroundColor: generateColor(i)
                 }));
 
                 const ctx = document.getElementById(`barChart_${deptKey}`)?.getContext("2d");
@@ -319,17 +345,11 @@
                             responsive: true,
                             plugins: {
                                 tooltip: { mode: 'index', intersect: false },
-                                title: {
-                                    display: true,
-                                    text: 'Class-wise Subject Performance'
-                                }
+                                title: { display: true, text: 'Class-wise Subject Performance' }
                             },
                             scales: {
                                 x: { stacked: false },
-                                y: {
-                                    beginAtZero: true,
-                                    ticks: { precision: 0 }
-                                }
+                                y: { beginAtZero: true, ticks: { precision: 0 } }
                             }
                         }
                     });
@@ -337,8 +357,5 @@
             });
         });
     </script>
-
-    
-    
 </body>
 </html>    

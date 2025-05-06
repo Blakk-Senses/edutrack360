@@ -95,8 +95,17 @@ def unified_login(request):
 #------------- LOGOUT --------------------
 
 def logout_view(request):
+    # Get the user's role before logging out
+    role = getattr(request.user, 'role', None)
+
+    # Log the user out
     logout(request)
+
+    # Redirect based on role
+    if role == 'admin':
+        return redirect('admin_login')
     return redirect('login')
+
 
 #---------- PASSWORD RESET ------------------------
 

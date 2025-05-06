@@ -1002,7 +1002,6 @@ def bulk_upload_results(request):
         academic_year = str(row.get("Academic Year") or "").strip()
         term = str(row.get("Term") or "").strip()
 
-        # New fields
         try:
             cat1 = float(row.get("CAT1", 0))
             project_work = float(row.get("Project Work", 0))
@@ -1044,10 +1043,27 @@ def bulk_upload_results(request):
             errors.append({"row": index + 1, "error": f"Invalid class '{class_name}' for school {teacher_school.name}."})
             continue
 
-        try:
-            subject = Subject.objects.get(name=subject_name, department=class_group.department)
-        except Subject.DoesNotExist:
-            errors.append({"row": index + 1, "error": f"Invalid subject '{subject_name}' for class {class_name}."})
+        # New validation: class department must be part of school
+        if not class_group.department or class_group.department not in teacher_school.department.all():
+            errors.append({
+                "row": index + 1,
+                "error": f"Invalid class: the department '{class_group.department}' of class '{class_name}' is not part of school '{teacher_school.name}'."
+            })
+            continue
+
+        # New subject matching logic
+        matched_subjects = Subject.objects.filter(name__iexact=subject_name)
+        subject = None
+        for subj in matched_subjects:
+            if class_group.department in subj.department.all():
+                subject = subj
+                break
+
+        if not subject:
+            errors.append({
+                "row": index + 1,
+                "error": f"Subject '{subject_name}' is not offered in the department of class '{class_name}'."
+            })
             continue
 
         if not can_teacher_upload_result(teacher, class_group, subject):
@@ -1122,6 +1138,7 @@ def bulk_upload_results(request):
         "message": "Bulk upload completed",
         "errors": [f"Row {e['row']}: {e['error']}" for e in errors]
     }, status=201)
+
 
 TERM_MAPPING = {"1": "Term 1", "2": "Term 2", "3": "Term 3"}
 

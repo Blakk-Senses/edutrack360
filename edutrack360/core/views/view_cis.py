@@ -41,7 +41,7 @@ from core.models import (
     Circuit, StudentMark, Department
 )
 from core.forms import (
-    AddSchoolForm, UserRegistrationForm
+    AddSchoolForm,
 )
 
 logger = logging.getLogger(__name__)
@@ -550,7 +550,6 @@ def get_district_performance_context(request):
     if not hasattr(user, 'district') or user.role != 'cis':
         return redirect("homepage")
 
-    
     circuits_in_district = Circuit.objects.filter(district=user.district)
     available_circuits = [{"id": c.id, "name": c.name} for c in circuits_in_district]
 
@@ -561,7 +560,6 @@ def get_district_performance_context(request):
 
     print(f"🧭 Circuits selected for analysis: {circuits_to_analyze.count()}")
 
-    # Container for all circuit analyses
     circuit_analyses = []
 
     for circuit in circuits_to_analyze:
@@ -573,7 +571,9 @@ def get_district_performance_context(request):
             academic_year=academic_year,
             term=selected_term,
             subject__results__status="Submitted"
-        ).distinct()
+        ).select_related("student__school", "student__class_group", "subject")
+
+        selected_marks = deduplicate_marks(selected_marks)
 
         school_departments = {}
         school_subject_averages = {}
@@ -582,7 +582,7 @@ def get_district_performance_context(request):
         school_chart_data = {}
 
         for school in schools_in_circuit:
-            school_marks = selected_marks.filter(student__school_id=school.id)
+            school_marks = [m for m in selected_marks if m.student.school_id == school.id]
 
             dept_structure = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
             for mark in school_marks:
@@ -649,7 +649,7 @@ def get_district_performance_context(request):
             school_score_buckets[school.name] = score_buckets
             school_chart_data[school.name] = chart_data_per_school
 
-        # Trend Data
+        # === Trend Data ===
         base_year = int(academic_year.split("/")[0])
         prev_1 = f"{base_year - 1}/{base_year}"
         prev_2 = f"{base_year - 2}/{base_year - 1}"
@@ -669,7 +669,9 @@ def get_district_performance_context(request):
 
         trend_marks = StudentMark.objects.filter(
             student__school__in=schools_in_circuit
-        ).filter(q_terms, subject__results__status="Submitted")
+        ).filter(q_terms, subject__results__status="Submitted").select_related("student", "subject")
+
+        trend_marks = deduplicate_marks(trend_marks)
 
         term_aggregates = {key: [] for key in term_keys}
         year_aggregates = {year: [] for year in academic_years}
@@ -721,16 +723,18 @@ def get_district_performance_context(request):
             "selected_circuit": circuit_id,
             "available_circuits": available_circuits
         },
-        # Passing chart data to frontend
-        "term_chart_data": json.dumps({
-            "labels": term_labels,
-            "data": term_values
-        }),
-        "year_chart_data": json.dumps({
-            "labels": year_labels,
-            "data": year_values
-        })
     }
+
+def deduplicate_marks(marks_queryset):
+    seen = set()
+    result = []
+    for m in marks_queryset:
+        key = (m.student.id, m.subject.id)
+        if key not in seen:
+            seen.add(key)
+            result.append(m)
+    return result
+
 
 @login_required
 def download_district_performance_pdf(request):
@@ -799,7 +803,7 @@ def download_district_performance_pdf(request):
             # Add School Name underlined and bolded
             elements.append(Paragraph(f"<u>{school_name}</u>", school_style))
             for dept, dept_info in dept_data.items():
-                elements.append(Paragraph(f"{dept} Department", subtitle_style))
+                elements.append(Paragraph(f"{dept}", subtitle_style))
                 table_data = [["Subject"] + dept_info["all_classes"]]
 
                 for subject, class_scores in dept_info["subjects"].items():
@@ -1042,24 +1046,115 @@ def user_search(request):
     print("Request method was not POST.")
     return JsonResponse({"success": False, "message": "Invalid request method."}, status=400)
 
+
 @login_required
 def create_user(request):
+    print("[DEBUG] Request method:", request.method)
+    print("[DEBUG] Logged-in user:", request.user)
+    print("[DEBUG] User ID:", request.user.id)
+    print("[DEBUG] User role:", request.user.role if hasattr(request.user, 'role') else "No role")
+    print("[DEBUG] User district:", getattr(request.user, 'district', None))
+    print("[DEBUG] User school:", getattr(request.user, 'school', None))
+    print("[DEBUG] User circuit:", getattr(request.user, 'circuit', None))
+
+    # Ensure the logged-in user has necessary attributes
+    if not hasattr(request.user, 'district') or not hasattr(request.user, 'school') or not hasattr(request.user, 'circuit'):
+        print("[ERROR] User is missing required attributes (district, school, circuit)")
+        return JsonResponse({"success": False, "message": "User does not have required attributes."}, status=400)
+
     if request.method == "POST":
-        form = UserRegistrationForm(
-            request.POST,
-            school=request.user.school,
-            district=request.user.district,  # Pass district from logged-in user
-            circuit=request.user.circuit  # Pass circuit from logged-in user
+        print("[DEBUG] Request.POST data:", request.POST)
+
+        # Get the POST data
+        district_id = request.POST.get('district')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        email = request.POST.get('email')
+        phone_number = request.POST.get('phone_number')
+        staff_id = request.POST.get('staff_id')
+        license_number = request.POST.get('license_number')
+        role = request.POST.get('role')
+        password1 = request.POST.get('password1')
+        password2 = request.POST.get('password2')
+        
+
+        # Validate password match
+        if password1 != password2:
+            return JsonResponse({"success": False, "message": "Passwords do not match."}, status=400)
+
+        # Retrieve district by ID
+        try:
+            district = District.objects.get(id=district_id)
+        except ValueError:
+            # Try to fallback to name if ID fails
+            try:
+                district = District.objects.get(name=district_id)
+            except District.DoesNotExist:
+                return JsonResponse({"success": False, "message": "Invalid district."}, status=400)
+
+        # Validate role and handle required fields
+        if role not in ['headteacher', 'siso', 'teacher']:
+            return JsonResponse({"success": False, "message": "Invalid role selected."}, status=400)
+
+        if role == 'headteacher' and not request.POST.get('school'):
+            return JsonResponse({"success": False, "message": "School is required for Headteacher role."}, status=400)
+
+        if role == 'siso' and not request.POST.get('circuit'):
+            return JsonResponse({"success": False, "message": "Circuit is required for SISO role."}, status=400)
+
+        # Create user
+        user = User(
+            staff_id=staff_id,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            phone_number=phone_number,
+            license_number=license_number,
+            district=district,  # Assign district
+            role=role,  # Assign role
         )
+        user.set_password(password1)
 
-        if form.is_valid():
-            user = form.save()
+        # Handle user roles and assignments
+        if role == 'headteacher':
+            school_id = request.POST.get('school')
+            try:
+                school = School.objects.get(id=school_id)
+                user.school = school
+                user.circuit = school.circuit
+            except School.DoesNotExist:
+                return JsonResponse({"success": False, "message": "Invalid school."}, status=400)
+
+        elif role == 'siso':
+            circuit_id = request.POST.get('circuit')
+            try:
+                circuit = Circuit.objects.get(id=circuit_id, district=district)
+                user.circuit = circuit
+            except Circuit.DoesNotExist:
+                return JsonResponse({"success": False, "message": "Invalid circuit."}, status=400)
+
+        elif role == 'teacher':
+            user.school = request.user.school
+            user.circuit = request.user.circuit
+
+        try:
+            # Save the user to the database
+            user.save()
+
+            # Assign reverse role references if necessary
+            if role == 'headteacher' and user.school:
+                user.school.headteacher = user
+                user.school.save()
+            elif role == 'siso' and user.circuit:
+                user.circuit.siso = user
+                user.circuit.save()
+
             return JsonResponse({"success": True, "message": "User registered successfully!"})
-        else:
-            print("[DEBUG] Form errors:", form.errors)  # Add this
-            return JsonResponse({"success": False, "errors": form.errors}, status=400)
 
+        except ValidationError as e:
+            return JsonResponse({"success": False, "message": f"Validation error: {str(e)}"}, status=400)
 
+    print("[WARNING] Invalid request method.")
     return JsonResponse({"success": False, "message": "Invalid request method."}, status=400)
 
 

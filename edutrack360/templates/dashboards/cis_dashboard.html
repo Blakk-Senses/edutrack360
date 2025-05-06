@@ -75,7 +75,26 @@
                     </div>
                 </div>
             </div>
-            <i class="fas fa-user-circle"></i>
+            <!-- User Profile Dropdown Template -->
+            <div class="dropdown user-dropdown-wrapper position-relative">
+                <!-- User Icon -->
+                <a href="#" class="dropdown-toggle text-decoration-none" id="userIcon" role="button" aria-expanded="false" tabindex="0">
+                    <i class="fas fa-user-circle fa-lg"></i>
+                </a>
+            
+                <!-- Dropdown Menu -->
+                <div class="dropdown-menu dropdown-menu-end user-dropdown d-none" id="userDropdown" role="menu">
+                    <ul class="list-unstyled mb-0" id="dropdownMenu">
+                        <li class="dropdown-item" tabindex="0">Profile</li>
+                        <li class="dropdown-item" tabindex="0">Account Settings</li>
+                        <li class="dropdown-item logout" tabindex="0">
+                            <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link text-danger">
+                                <i class="fas fa-sign-out-alt me-2"></i> Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
             <span class="welcome-text">Welcome , Chief Inspector {{ user.first_name }}</span>
         </div>
         </div>
@@ -106,10 +125,6 @@
         <a href="{% url 'cis:user_management' %}">
             <i class="fas fa-users-cog"></i>
             <span class="tooltip">User Management</span>
-        </a>
-        <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link">
-            <i class="fas fa-sign-out-alt"></i>
-            <span class="tooltip">Logout</span>
         </a>
     </div>
 
@@ -289,27 +304,26 @@
     </div>
 
 
-    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <!-- JS Dependencies -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        function formatPercent(value) {
-            return value !== null && !isNaN(value) ? parseFloat(value).toFixed(2) + "%" : "N/A";
-        }
-    
+        const formatPercent = (value) => value !== null && !isNaN(value) ? `${parseFloat(value).toFixed(2)}%` : "N/A";
+
         function updateList(selector, data, placeholderText) {
             const html = data.length
-                ? data.map(item => `<li>${item.name || item.school || item.subject} (${formatPercent(item.average_score || item.score)})</li>`).join("")
+                ? data.map(item =>
+                    `<li>${item.name || item.school || item.subject} (${formatPercent(item.average_score || item.score)})</li>`
+                ).join("")
                 : `<li>${placeholderText}</li>`;
             $(selector).html(html);
         }
-    
+
         function fetchSISODashboardData() {
             const academic_year = $("#yearFilter").val();
             const term = $("#termFilter").val();
-    
+
             $.ajax({
                 url: "{% url 'dashboards:cis_dashboard' %}",
                 data: { academic_year, term },
@@ -320,17 +334,17 @@
                     $(".total-teachers .value").text(data.total_teachers || 0);
                     $(".total-students-assessed .value").text(data.total_students_assessed || 0);
                     $(".average-district-performance .value").text(formatPercent(data.total_district_average));
-    
+
                     updateList(".best-performing-schools .value", data.best_performing_schools, "No data available");
                     updateList(".weakest-performing-schools .value", data.weakest_performing_schools, "No data available");
                     updateList(".top-performing-subjects .value", data.best_performing_subjects, "No data available");
                     updateList(".bottom-performing-subjects .value", data.weakest_performing_subjects, "No data available");
-    
+
                     const notifHtml = data.notifications.length
                         ? data.notifications.map(n => `<li>${n}</li>`).join("")
                         : "<li>No recent uploads</li>";
                     $(".recent-uploads").html(notifHtml);
-    
+
                     updateTrendChart(data.performance_trends);
                 },
                 error: function () {
@@ -338,8 +352,8 @@
                 }
             });
         }
-    
-        // Chart Initialization
+
+        // Chart.js: Performance Trend Chart
         const ctx = document.getElementById("performanceTrendsChart").getContext("2d");
         const trendChart = new Chart(ctx, {
             type: "bar",
@@ -367,111 +381,161 @@
                 }
             }
         });
-    
+
         function updateTrendChart(trendData) {
             trendChart.data.labels = trendData.map(e => e.school);
             trendChart.data.datasets[0].data = trendData.map(e => e.score);
             trendChart.update();
         }
-    
-        $(document).ready(function () {
-            fetchSISODashboardData();  // Initial load
-    
-            // Re-fetch data when filters change
-            $("#yearFilter, #termFilter").change(function () {
-                fetchSISODashboardData();
-            });
-    
-            $(document).ready(function () {
-                function fetchSISONotifications() {
-                    $.ajax({
-                        url: "{% url 'cis:get_notifications' %}",
-                        method: "GET",
-                        success: function (response) {
-                            const notificationList = $("#notificationList");
-                            const notificationCount = $("#notificationCount");
 
-                            notificationList.empty();
+        // Notifications
+        function fetchSISONotifications() {
+            $.ajax({
+                url: "{% url 'cis:get_notifications' %}",
+                method: "GET",
+                success: function (response) {
+                    const notificationList = $("#notificationList");
+                    const notificationCount = $("#notificationCount");
 
-                            if (response.notifications.length > 0) {
-                                response.notifications.forEach(notification => {
-                                    const li = `<li data-id="${notification.id}" class="notification-item">
-                                        ${notification.message} <br>
-                                        <small>${notification.created_at}</small>
-                                    </li>`;
-                                    notificationList.append(li);
-                                });
+                    notificationList.empty();
 
-                                notificationCount.text(response.notifications.length).show();
-                            } else {
-                                notificationList.append('<li class="no-notifications">No new notifications</li>');
-                                notificationCount.hide();
-                            }
-                        },
-                        error: function () {
-                            console.error("Error fetching notifications.");
-                        }
-                    });
-                }
-
-                // Mark notification as read
-                $(document).on("click", ".notification-item", function () {
-                    const notificationId = $(this).data("id");
-                    const notificationItem = $(this);
-
-                    $.ajax({
-                        url: `/cis/notifications/mark-as-read/${notificationId}/`,
-                        method: "POST",
-                        headers: { "X-CSRFToken": "{{ csrf_token }}" },
-                        success: function () {
-                            notificationItem.fadeOut(300, function () {
-                                $(this).remove();
-                                fetchSISONotifications();
-                            });
-                        },
-                        error: function () {
-                            console.error("Failed to mark notification as read.");
-                        }
-                    });
-                });
-
-                // Polling for new notifications
-                setInterval(fetchSISONotifications, 30000);
-
-                // Toggle notifications dropdown
-                $("#notificationBell").click(function (event) {
-                    event.stopPropagation();
-                    $("#notificationDropdown").toggleClass("show");
-                });
-
-                // Close dropdown when clicking outside
-                $(document).click(function (event) {
-                    if (!$(event.target).closest(".notification-container").length) {
-                        $("#notificationDropdown").removeClass("show");
+                    if (response.notifications.length > 0) {
+                        response.notifications.forEach(notification => {
+                            notificationList.append(`
+                                <li data-id="${notification.id}" class="notification-item">
+                                    ${notification.message}<br>
+                                    <small>${notification.created_at}</small>
+                                </li>
+                            `);
+                        });
+                        notificationCount.text(response.notifications.length).show();
+                    } else {
+                        notificationList.append('<li class="no-notifications">No new notifications</li>');
+                        notificationCount.hide();
                     }
-                });
-
-                // Fetch notifications on page load
-                fetchSISONotifications();
+                },
+                error: function () {
+                    console.error("Error fetching notifications.");
+                }
             });
+        }
 
-    
-            // Handle logout logic
+        $(document).on("click", ".notification-item", function () {
+            const notificationId = $(this).data("id");
+            const notificationItem = $(this);
+
+            $.ajax({
+                url: `/cis/notifications/mark-as-read/${notificationId}/`,
+                method: "POST",
+                headers: { "X-CSRFToken": "{{ csrf_token }}" },
+                success: function () {
+                    notificationItem.fadeOut(300, function () {
+                        $(this).remove();
+                        fetchSISONotifications();
+                    });
+                },
+                error: function () {
+                    console.error("Failed to mark notification as read.");
+                }
+            });
+        });
+
+        // Dropdown Logic
+        const userIcon = document.getElementById('userIcon');
+        const userDropdown = document.getElementById('userDropdown');
+        const dropdownItems = userDropdown.querySelectorAll('.dropdown-item');
+        let activeIndex = -1;
+
+        function focusItem(index) {
+            clearDropdownActive();
+            activeIndex = index;
+            const item = dropdownItems[activeIndex];
+            item.classList.add('active');
+            item.focus();
+        }
+
+        function clearDropdownActive() {
+            dropdownItems.forEach(item => item.classList.remove('active'));
+        }
+
+        userIcon.addEventListener('click', (e) => {
+            e.preventDefault();
+            userDropdown.classList.toggle('show');
+            userDropdown.classList.toggle('d-none');
+            activeIndex = -1;
+            clearDropdownActive();
+        });
+
+        window.addEventListener('click', (e) => {
+            if (!e.target.closest('.user-dropdown-wrapper')) {
+                userDropdown.classList.remove('show');
+                userDropdown.classList.add('d-none');
+                clearDropdownActive();
+            }
+        });
+
+        userIcon.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                userDropdown.classList.add('show');
+                userDropdown.classList.remove('d-none');
+                focusItem(0);
+            }
+        });
+
+        userDropdown.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                focusItem((activeIndex + 1) % dropdownItems.length);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                focusItem((activeIndex - 1 + dropdownItems.length) % dropdownItems.length);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                dropdownItems[activeIndex]?.click();
+            } else if (e.key === 'Escape') {
+                userDropdown.classList.remove('show');
+                userDropdown.classList.add('d-none');
+                clearDropdownActive();
+            }
+        });
+
+        // Logout Modal
+        document.addEventListener("DOMContentLoaded", function () {
             const logoutBtn = document.getElementById("logoutBtn");
             const confirmLogout = document.getElementById("confirmLogout");
             const logoutUrl = logoutBtn.getAttribute("data-logout-url");
+
             const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
-    
+
             logoutBtn.addEventListener("click", function (e) {
                 e.preventDefault();
                 logoutModal.show();
             });
-    
+
             confirmLogout.addEventListener("click", function () {
                 window.location.href = logoutUrl;
             });
+
+            fetchSISODashboardData();
+            fetchSISONotifications();
+            setInterval(fetchSISONotifications, 30000);
+
+            $("#yearFilter, #termFilter").change(fetchSISODashboardData);
+
+            $("#notificationBell").click(function (event) {
+                event.stopPropagation();
+                $("#notificationDropdown").toggleClass("show");
+            });
+
+            $(document).click(function (event) {
+                if (!$(event.target).closest(".notification-container").length) {
+                    $("#notificationDropdown").removeClass("show");
+                }
+            });
         });
     </script>
+
 
 </body>
 </html>

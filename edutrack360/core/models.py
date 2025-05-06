@@ -116,7 +116,11 @@ class User(AbstractBaseUser, PermissionsMixin):
             if not self.license_number:
                 raise ValidationError(_("License number is required for non-admin users."))
 
-            # District check only required for non-admin roles if it is not set from the form
+            # If the district is not set in the form, inherit it from the logged-in user
+            if not self.district and self.role != 'admin' and hasattr(self, 'user') and self.user:
+                self.district = self.user.district  # Inherit district from the logged-in user
+            
+            # Now, check if district is still None (if not set from the form or inherited)
             if not self.district:
                 raise ValidationError(_("District is required for non-admin users."))
 
@@ -127,6 +131,11 @@ class User(AbstractBaseUser, PermissionsMixin):
             # School check for Headteacher role
             if self.role == 'headteacher' and not self.school:
                 raise ValidationError(_("School is required for Headteacher users."))
+
+
+def __str__(self):
+    return f"{self.first_name or ''} {self.last_name or ''} ({self.staff_id})"
+
 
 
     def __str__(self):

@@ -187,19 +187,21 @@
             <h3 class="form-title">Create New User</h3>
             <form id="create-user-form">
                 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                <input type="hidden" name="district" value="{{ request.user.district.id }}">
+
                 <div class="mb-3"><input type="text" name="first_name" class="form-control" placeholder="First Name" required></div>
                 <div class="mb-3"><input type="text" name="last_name" class="form-control" placeholder="Last Name" required></div>
                 <div class="mb-3"><input type="email" name="email" class="form-control" placeholder="Email" required></div>
                 <div class="mb-3"><input type="text" name="phone_number" class="form-control" placeholder="Phone Number"></div>
                 <div class="mb-3"><input type="number" name="staff_id" class="form-control" placeholder="Staff ID" required></div>
                 <div class="mb-3"><input type="text" name="license_number" class="form-control" placeholder="License Number" required></div>
-
+    
                 <div class="mb-3">
                     <select name="role" id="role" class="form-select" required>
                         <option value="">Select Role</option>
                     </select>
                 </div>
-
+    
                 <!-- Password Fields -->
                 <div class="mb-3">
                     <input type="password" name="password1" class="form-control" placeholder="Password" required>
@@ -207,7 +209,7 @@
                 <div class="mb-3">
                     <input type="password" name="password2" class="form-control" placeholder="Confirm Password" required>
                 </div>
-
+    
                 <div class="mb-3" id="update-school-container" style="display:none;">
                     <select name="school" id="school" class="form-select">
                         <option value="">Select School</option>
@@ -218,7 +220,7 @@
                         <option value="">Select Circuit</option>
                     </select>
                 </div>
-
+    
                 <div class="form-button-container shadow-sm border rounded px-4 py-3 mt-4">
                     <button type="submit" class="btn btn-outline-success w-100">Create User</button>
                 </div>
@@ -226,6 +228,7 @@
             <div id="create-result" class="mt-4"></div>
         </div>
     </div>
+    
 
     <!-- Modal -->
     <div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">

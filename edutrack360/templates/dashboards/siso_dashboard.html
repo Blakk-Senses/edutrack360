@@ -77,7 +77,26 @@
                 </div>
             </div>
             
-            <i class="fas fa-user-circle"></i>
+            <!-- User Profile Dropdown Template -->
+            <div class="dropdown user-dropdown-wrapper position-relative">
+                <!-- User Icon -->
+                <a href="#" class="dropdown-toggle text-decoration-none" id="userIcon" role="button" aria-expanded="false" tabindex="0">
+                    <i class="fas fa-user-circle fa-lg"></i>
+                </a>
+            
+                <!-- Dropdown Menu -->
+                <div class="dropdown-menu dropdown-menu-end user-dropdown d-none" id="userDropdown" role="menu">
+                    <ul class="list-unstyled mb-0" id="dropdownMenu">
+                        <li class="dropdown-item" tabindex="0">Profile</li>
+                        <li class="dropdown-item" tabindex="0">Account Settings</li>
+                        <li class="dropdown-item logout" tabindex="0">
+                            <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link text-danger">
+                                <i class="fas fa-sign-out-alt me-2"></i> Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
             <span class="welcome-text">Welcome, {{ user.first_name }}</span>
         </div>
     </div>
@@ -95,10 +114,6 @@
             <i class="fas fa-bell"></i>  <!-- Using bell icon for notifications -->
             <span class="tooltip">Send Notifications</span>
         </a>        
-        <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link">
-            <i class="fas fa-sign-out-alt"></i>
-            <span class="tooltip">Logout</span>
-        </a>
     </div>
 
     <div class="main-content">
@@ -252,19 +267,32 @@
     
     <!-- Logout Confirmation Modal -->
     <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content text-center p-4 rounded-4 shadow-lg">
-                <div class="modal-body">
+        <div class="modal-dialog modal-dialog-centered custom-modal">
+            <div class="modal-content text-center p-4 shadow-sm rounded-4 border-0">
+                <div class="modal-body px-3">
                     <div class="mb-3">
-                        <i class="fa fa-exclamation-circle text-warning" style="font-size: 50px;"></i>
+                        <i class="fa fa-exclamation-circle text-warning" style="font-size: 40px;"></i>
                     </div>
-                    <h4 class="fw-bold">Are you sure?</h4>
-                    <p class="text-muted">You want to logout of the system?</p>
+                    <h5 class="fw-bold mb-2">Are you sure?</h5>
+                    <p class="text-muted small">You want to logout of the system?</p>
                 </div>
-                <div class="modal-footer border-0 d-flex justify-content-center">
-                    <button type="button" class="btn btn-danger px-4 py-2 rounded-pill" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-success px-4 py-2 rounded-pill" id="confirmLogout">Logout!</button>
-                </div>
+                <div class="d-flex gap-2 px-3 pb-3">
+                    <div class="d-flex gap-2 px-3 pb-3">
+                        <div class="d-flex justify-content-center gap-2 px-3 pb-3">
+                            <div class="d-flex justify-content-center gap-3 px-3 pb-3">
+                                <button type="button" class="btn custom-btn rounded-pill px-4" data-bs-dismiss="modal">
+                                    Cancel
+                                </button>
+                                <button type="button" class="btn custom-btn danger-btn rounded-pill px-4" id="confirmLogout">
+                                    Logout
+                                </button>
+                            </div>
+                            
+                        </div>
+                        
+                    </div>
+                    
+                </div>                
             </div>
         </div>
     </div>
@@ -274,6 +302,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // Utility
         function formatPercent(value) {
             return value !== null && !isNaN(value) ? parseFloat(value).toFixed(2) + "%" : "N/A";
         }
@@ -285,6 +314,7 @@
             $(selector).html(html);
         }
     
+        // Fetch Dashboard Data
         function fetchSISODashboardData() {
             const academic_year = $("#yearFilter").val();
             const term = $("#termFilter").val();
@@ -353,92 +383,148 @@
             trendChart.update();
         }
     
-        $(document).ready(function () {
-            fetchSISODashboardData();  // Initial load
+        // Notification Handling
+        function fetchSISONotifications() {
+            $.ajax({
+                url: "{% url 'siso:get_notifications' %}",
+                method: "GET",
+                success: function (response) {
+                    const notificationList = $("#notificationList");
+                    const notificationCount = $("#notificationCount");
     
-            // Re-fetch data when filters change
-            $("#yearFilter, #termFilter").change(function () {
-                fetchSISODashboardData();
-            });
+                    notificationList.empty();
     
-            $(document).ready(function () {
-                function fetchSISONotifications() {
-                    $.ajax({
-                        url: "{% url 'siso:get_notifications' %}",
-                        method: "GET",
-                        success: function (response) {
-                            const notificationList = $("#notificationList");
-                            const notificationCount = $("#notificationCount");
-
-                            notificationList.empty();
-
-                            if (response.notifications.length > 0) {
-                                response.notifications.forEach(notification => {
-                                    const li = `<li data-id="${notification.id}" class="notification-item">
-                                        ${notification.message} <br>
-                                        <small>${notification.created_at}</small>
-                                    </li>`;
-                                    notificationList.append(li);
-                                });
-
-                                notificationCount.text(response.notifications.length).show();
-                            } else {
-                                notificationList.append('<li class="no-notifications">No new notifications</li>');
-                                notificationCount.hide();
-                            }
-                        },
-                        error: function () {
-                            console.error("Error fetching notifications.");
-                        }
-                    });
-                }
-
-                // Mark notification as read
-                $(document).on("click", ".notification-item", function () {
-                    const notificationId = $(this).data("id");
-                    const notificationItem = $(this);
-
-                    $.ajax({
-                        url: `/siso/notifications/mark-as-read/${notificationId}/`,
-                        method: "POST",
-                        headers: { "X-CSRFToken": "{{ csrf_token }}" },
-                        success: function () {
-                            notificationItem.fadeOut(300, function () {
-                                $(this).remove();
-                                fetchSISONotifications();
-                            });
-                        },
-                        error: function () {
-                            console.error("Failed to mark notification as read.");
-                        }
-                    });
-                });
-
-                // Polling for new notifications
-                setInterval(fetchSISONotifications, 30000);
-
-                // Toggle notifications dropdown
-                $("#notificationBell").click(function (event) {
-                    event.stopPropagation();
-                    $("#notificationDropdown").toggleClass("show");
-                });
-
-                // Close dropdown when clicking outside
-                $(document).click(function (event) {
-                    if (!$(event.target).closest(".notification-container").length) {
-                        $("#notificationDropdown").removeClass("show");
+                    if (response.notifications.length > 0) {
+                        response.notifications.forEach(notification => {
+                            const li = `<li data-id="${notification.id}" class="notification-item">
+                                ${notification.message} <br>
+                                <small>${notification.created_at}</small>
+                            </li>`;
+                            notificationList.append(li);
+                        });
+    
+                        notificationCount.text(response.notifications.length).show();
+                    } else {
+                        notificationList.append('<li class="no-notifications">No new notifications</li>');
+                        notificationCount.hide();
                     }
-                });
-
-                // Fetch notifications on page load
-                fetchSISONotifications();
+                },
+                error: function () {
+                    console.error("Error fetching notifications.");
+                }
             });
-
+        }
     
-            // Handle logout logic
+        function markNotificationAsRead(notificationId, notificationItem) {
+            $.ajax({
+                url: `/siso/notifications/mark-as-read/${notificationId}/`,
+                method: "POST",
+                headers: { "X-CSRFToken": "{{ csrf_token }}" },
+                success: function () {
+                    notificationItem.fadeOut(300, function () {
+                        $(this).remove();
+                        fetchSISONotifications();
+                    });
+                },
+                error: function () {
+                    console.error("Failed to mark notification as read.");
+                }
+            });
+        }
+    
+        function handleDeadlineAlert() {
+            const alertElement = document.getElementById("deadlineAlert");
+    
+            if (!alertElement) return;
+    
+            const currentDate = new Date();
+            const deadlineDate = new Date("{{ deadline_status.deadline_date }}");
+            const timeRemaining = deadlineDate - currentDate;
+    
+            if (timeRemaining <= 14 * 24 * 60 * 60 * 1000 && timeRemaining > 0) {
+                const flashInterval = setInterval(() => {
+                    alertElement.classList.toggle("flashing");
+                }, 1000);
+    
+                alertElement.addEventListener("close", () => clearInterval(flashInterval));
+            }
+    
+            alertElement.classList.add("show");
+    
+            if (currentDate >= deadlineDate) {
+                setTimeout(() => {
+                    alertElement.classList.add("custom-fade-out");
+                }, 20000);
+            }
+        }
+    
+        // User Dropdown
+        function setupUserDropdown() {
+            const userIcon = document.getElementById('userIcon');
+            const userDropdown = document.getElementById('userDropdown');
+            const dropdownItems = userDropdown.querySelectorAll('.dropdown-item');
+            let activeIndex = -1;
+    
+            userIcon.addEventListener('click', (e) => {
+                e.preventDefault();
+                userDropdown.classList.toggle('show');
+                userDropdown.classList.toggle('d-none');
+                activeIndex = -1;
+                clearDropdownActive();
+            });
+    
+            window.addEventListener('click', (e) => {
+                if (!e.target.closest('.user-dropdown-wrapper')) {
+                    userDropdown.classList.remove('show');
+                    userDropdown.classList.add('d-none');
+                    clearDropdownActive();
+                }
+            });
+    
+            userIcon.addEventListener('keydown', (e) => {
+                if (['Enter', 'ArrowDown'].includes(e.key)) {
+                    e.preventDefault();
+                    userDropdown.classList.add('show');
+                    userDropdown.classList.remove('d-none');
+                    focusItem(0);
+                }
+            });
+    
+            userDropdown.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    focusItem((activeIndex + 1) % dropdownItems.length);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    focusItem((activeIndex - 1 + dropdownItems.length) % dropdownItems.length);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    dropdownItems[activeIndex]?.click();
+                } else if (e.key === 'Escape') {
+                    userDropdown.classList.remove('show');
+                    userDropdown.classList.add('d-none');
+                    clearDropdownActive();
+                }
+            });
+    
+            function focusItem(index) {
+                clearDropdownActive();
+                activeIndex = index;
+                dropdownItems[activeIndex].classList.add('active');
+                dropdownItems[activeIndex].focus();
+            }
+    
+            function clearDropdownActive() {
+                dropdownItems.forEach(item => item.classList.remove('active'));
+            }
+        }
+    
+        // Logout Modal
+        function setupLogoutModal() {
             const logoutBtn = document.getElementById("logoutBtn");
             const confirmLogout = document.getElementById("confirmLogout");
             const logoutUrl = logoutBtn.getAttribute("data-logout-url");
+    
             const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
     
             logoutBtn.addEventListener("click", function (e) {
@@ -449,43 +535,38 @@
             confirmLogout.addEventListener("click", function () {
                 window.location.href = logoutUrl;
             });
-        });
-
-        const alertElement = document.getElementById("deadlineAlert");
-
-        if (alertElement) {
-            let flashInterval;
-
-            // Function to toggle alert visibility for flashing effect
-            function flashAlert() {
-                alertElement.classList.toggle("flashing");  // Flashing effect
-            }
-
-            // Start flashing if the deadline is within 14 days
-            const currentDate = new Date();
-            const deadlineDate = new Date("{{ deadline_status.deadline_date }}");
-            const timeRemaining = deadlineDate - currentDate;
-
-            if (timeRemaining <= 14 * 24 * 60 * 60 * 1000 && timeRemaining > 0) {  // Deadline is within 14 days
-                flashInterval = setInterval(flashAlert, 1000);  // Flash every 1 second
-            }
-
-            // Make sure the alert is shown initially
-            alertElement.classList.add("show");  // Ensure the alert is shown
-
-            // Auto hide the alert after the deadline has passed
-            if (currentDate >= deadlineDate) {
-                setTimeout(function () {
-                    alertElement.classList.add("custom-fade-out");
-                }, 20000);
-            }
-
-            // Clean up flashing when the alert is manually dismissed or hidden
-            alertElement.addEventListener("close", function() {
-                clearInterval(flashInterval); // Stop flashing
-            });
         }
+    
+        // On Document Ready
+        $(function () {
+            fetchSISODashboardData();
+            fetchSISONotifications();
+            setupUserDropdown();
+            setupLogoutModal();
+            handleDeadlineAlert();
+    
+            $("#yearFilter, #termFilter").change(fetchSISODashboardData);
+    
+            $(document).on("click", ".notification-item", function () {
+                const id = $(this).data("id");
+                markNotificationAsRead(id, $(this));
+            });
+    
+            setInterval(fetchSISONotifications, 30000);
+    
+            $("#notificationBell").click(function (event) {
+                event.stopPropagation();
+                $("#notificationDropdown").toggleClass("show");
+            });
+    
+            $(document).click(function (event) {
+                if (!$(event.target).closest(".notification-container").length) {
+                    $("#notificationDropdown").removeClass("show");
+                }
+            });
+        });
     </script>
+    
     
 </body>
 </html>

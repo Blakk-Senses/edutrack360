@@ -56,22 +56,24 @@
                 <span id="notificationDot" class="position-absolute top-0 start-100 translate-middle badge rounded-circle bg-danger d-none" style="width: 10px; height: 10px; padding: 0;"></span>
             </div>
             
-            <!-- User Icon with Dropdown -->
-            <div class="user-dropdown-wrapper position-relative" style="display: inline-block;">
-                <i class="fas fa-user-circle" id="userIcon" style="cursor: pointer;"></i>
-                
-                <!-- Dropdown -->
-                <div id="userDropdown" class="user-dropdown position-absolute end-0 mt-2 d-none">
-                    <ul class="list-unstyled mb-0">
-                        <li class="dropdown-item active">Profile</li>
-                        <li class="dropdown-item">Account Settings</li>
-                        <li class="dropdown-item logout">
-                            <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link">
-                                <i class="fas fa-sign-out-alt me-2"></i>
-                                Logout
+            <!-- User Profile Dropdown Template -->
+            <div class="dropdown user-dropdown-wrapper position-relative">
+                <!-- User Icon -->
+                <a href="#" class="dropdown-toggle text-decoration-none" id="userIcon" role="button" aria-expanded="false" tabindex="0">
+                    <i class="fas fa-user-circle fa-lg"></i>
+                </a>
+            
+                <!-- Dropdown Menu -->
+                <div class="dropdown-menu dropdown-menu-end user-dropdown d-none" id="userDropdown" role="menu">
+                    <ul class="list-unstyled mb-0" id="dropdownMenu">
+                        <li class="dropdown-item" tabindex="0">Profile</li>
+                        <li class="dropdown-item" tabindex="0">Account Settings</li>
+                        <li class="dropdown-item logout" tabindex="0">
+                            <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link text-danger">
+                                <i class="fas fa-sign-out-alt me-2"></i> Logout
                             </a>
                         </li>
-                    </ul>                    
+                    </ul>
                 </div>
             </div>
             
@@ -454,17 +456,66 @@
         
         const userIcon = document.getElementById('userIcon');
         const userDropdown = document.getElementById('userDropdown');
+        const dropdownItems = userDropdown.querySelectorAll('.dropdown-item');
+        let activeIndex = -1;
 
-        userIcon.addEventListener('click', () => {
+        // Toggle dropdown
+        userIcon.addEventListener('click', (e) => {
+            e.preventDefault();
+            userDropdown.classList.toggle('show');
             userDropdown.classList.toggle('d-none');
+            activeIndex = -1;
+            clearDropdownActive();
         });
 
-        // Optional: Close dropdown when clicking outside
+        // Close on outside click
         window.addEventListener('click', (e) => {
             if (!e.target.closest('.user-dropdown-wrapper')) {
-                userDropdown.classList.add('d-none');
+            userDropdown.classList.remove('show');
+            userDropdown.classList.add('d-none');
+            clearDropdownActive();
             }
         });
+
+        // Toggle with keyboard from icon
+        userIcon.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            userDropdown.classList.add('show');
+            userDropdown.classList.remove('d-none');
+            focusItem(0);
+            }
+        });
+
+        // Keyboard nav inside dropdown
+        userDropdown.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            focusItem((activeIndex + 1) % dropdownItems.length);
+            } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            focusItem((activeIndex - 1 + dropdownItems.length) % dropdownItems.length);
+            } else if (e.key === 'Enter') {
+            e.preventDefault();
+            dropdownItems[activeIndex]?.click();
+            } else if (e.key === 'Escape') {
+            userDropdown.classList.remove('show');
+            userDropdown.classList.add('d-none');
+            clearDropdownActive();
+            }
+        });
+
+        function focusItem(index) {
+            clearDropdownActive();
+            activeIndex = index;
+            const item = dropdownItems[activeIndex];
+            item.classList.add('active');
+            item.focus();
+        }
+
+        function clearDropdownActive() {
+            dropdownItems.forEach(item => item.classList.remove('active'));
+        }
     </script>
 
 </body>

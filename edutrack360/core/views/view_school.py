@@ -14,7 +14,9 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.core.files.storage import default_storage
 from django.core.validators import validate_email
+from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
+from django.contrib.auth.hashers import make_password
 from django.core.paginator import Paginator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -96,34 +98,40 @@ def add_subject_to_department(request):
 
 @login_required
 def assign_teacher_to_subject(request, teacher_id, subject_id):
-    teacher = get_object_or_404(Teacher, id=teacher_id, school=request.user.school)
-    subject = get_object_or_404(Subject, id=subject_id)
+    user_school = request.user.school
+    teacher = get_object_or_404(Teacher, id=teacher_id, school=user_school)
 
-    # 🚨 Prevent assigning a subject if the teacher is already a class teacher anywhere in the school
+    try:
+        # ✅ Ensure the subject belongs to a department linked to the current school
+        subject = Subject.objects.get(id=subject_id, department__schools=user_school)
+    except Subject.DoesNotExist:
+        return JsonResponse({"error": "Subject is invalid or not linked to your school"}, status=400)
+
+    # 🚨 Prevent assigning a subject if the teacher is already a class teacher
     if SubjectTeacher.objects.filter(teacher=teacher, assigned_classes__isnull=False).exists():
         return JsonResponse({"error": "Teacher is already assigned as a class teacher and cannot be a subject teacher."}, status=400)
 
     if request.method == 'POST':
-        assigned_class_ids = request.POST.getlist('assigned_class_ids')  # Get multiple class IDs
-        assigned_classes = ClassGroup.objects.filter(id__in=assigned_class_ids, school=request.user.school)
+        assigned_class_ids = request.POST.getlist('assigned_class_ids')
+
+        # ✅ Fetch only classes from user's school
+        assigned_classes = ClassGroup.objects.filter(id__in=assigned_class_ids, school=user_school)
 
         if not assigned_classes.exists():
             return JsonResponse({"error": "Invalid class selection."}, status=400)
 
-        # Assign subject to teacher
+        # ✅ Assign subject to teacher
         teacher.assigned_subjects.add(subject)
 
-        # Create or get SubjectTeacher relationship
-        subject_teacher, created = SubjectTeacher.objects.get_or_create(teacher=teacher, subject=subject)
-
-        # Ensure the many-to-many relationship is updated correctly
-        subject_teacher.assigned_classes.set(assigned_classes)  # Efficiently replace class assignments
-
-        subject_teacher.save()  # Explicitly save changes
+        # ✅ Create or update SubjectTeacher link
+        subject_teacher, _ = SubjectTeacher.objects.get_or_create(teacher=teacher, subject=subject)
+        subject_teacher.assigned_classes.set(assigned_classes)
+        subject_teacher.save()
 
         return JsonResponse({"message": "Subject and class assigned successfully!"})
 
     return JsonResponse({"error": "Invalid request"}, status=400)
+
 
 
 
@@ -199,14 +207,25 @@ def get_subjects_by_teacher(request, teacher_id):  # <-- changed
 
 @login_required
 def get_subjects_by_department(request):
-    """Fetch subjects based on the selected department."""
+    """Fetch subjects based on the selected department, ensuring it belongs to the user's school."""
     department_id = request.GET.get("department_id")
+    user_school = request.user.school
 
     if not department_id:
         return JsonResponse({"error": "Department ID is required"}, status=400)
 
-    subjects = Subject.objects.filter(department__id=department_id).values("id", "name")
-    return JsonResponse({"subjects": list(subjects)})
+    try:
+        # ✅ Confirm the department is linked to the user's school
+        department = Department.objects.get(id=department_id, schools=user_school)
+
+        # ✅ Fetch subjects linked to that department
+        subjects = Subject.objects.filter(department=department).values("id", "name")
+
+        return JsonResponse({"subjects": list(subjects)})
+
+    except Department.DoesNotExist:
+        return JsonResponse({"error": "Invalid department selection"}, status=400)
+
 
 #----------------------------------------------------
 
@@ -341,19 +360,26 @@ def remove_teacher_from_class(request):
 @login_required
 def get_classes_by_department(request):
     """Fetch classes based on department, ensuring it belongs to the user's school."""
-    department_id = request.GET.get("department_id")  # ✅ Ensure correct query parameter
+    department_id = request.GET.get("department_id")
     user_school = request.user.school
 
     if not department_id:
         return JsonResponse({"error": "Department ID is required"}, status=400)
 
     try:
-        department = Department.objects.get(id=department_id, schools__in=[user_school])  # ✅ Fix school filter
-        classes = ClassGroup.objects.filter(department=department).values("id", "name")
+        # ✅ Ensure department is actually linked to the user's school
+        department = Department.objects.get(id=department_id, schools=user_school)
+
+        # ✅ Restrict classes to this department AND the current user's school
+        classes = ClassGroup.objects.filter(
+            department=department,
+            school=user_school
+        ).values("id", "name")
 
         return JsonResponse({"classes": list(classes)})
     except Department.DoesNotExist:
         return JsonResponse({"error": "Invalid department selection"}, status=400)
+
     
 
 @login_required
@@ -392,21 +418,63 @@ def teacher_management(request):
 
 @login_required
 def manual_upload(request):
-    if request.method == "POST":
-        form = TeacherRegistrationForm(
-            request.POST,
-            school=request.user.school,
-            district=request.user.district,  # Pass district
-            circuit=request.user.circuit  # Pass circuit
-        )
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method."}, status=405)
 
-        if form.is_valid():
-            user = form.save()  # Commit directly since department is removed
-            return JsonResponse({"success": True, "message": "Teacher registered successfully!"})
-        else:
-            return JsonResponse({"success": False, "errors": form.errors}, status=400)
+    data = request.POST
+    errors = {}
 
-    return JsonResponse({}, status=400)  # Return a proper response
+    required_fields = [
+        "staff_id", "license_number", "first_name", "last_name",
+        "email", "phone_number", "password1", "password2"
+    ]
+
+    # Check for required fields
+    for field in required_fields:
+        if not data.get(field):
+            errors[field] = "This field is required."
+
+    # Validate password match
+    if data.get("password1") != data.get("password2"):
+        errors["password"] = "Passwords do not match."
+
+    # Validate phone number
+    phone_number = data.get("phone_number", "")
+    phone_validator = RegexValidator(
+        r'^\+?1?\d{9,15}$', 'Enter a valid phone number.'
+    )
+    try:
+        phone_validator(phone_number)
+    except ValidationError as e:
+        errors["phone_number"] = str(e)
+
+    # Check for unique email
+    if User.objects.filter(email=data.get("email")).exists():
+        errors["email"] = "A user with this email already exists."
+
+    if errors:
+        return JsonResponse({"success": False, "errors": errors}, status=400)
+
+    # Proceed to create user
+    user = User.objects.create(
+        first_name=data.get("first_name"),
+        last_name=data.get("last_name"),
+        email=data.get("email"),
+        phone_number=phone_number,
+        password=make_password(data.get("password1")),
+        staff_id=data.get("staff_id"),
+        license_number=data.get("license_number"),
+        role="teacher",
+        school=request.user.school,
+        district=request.user.district,
+        circuit=request.user.circuit,
+    )
+
+    # Create linked Teacher object
+    Teacher.objects.create(user=user, school=request.user.school)
+
+    return JsonResponse({"success": True, "message": "Teacher registered successfully!"})
+
 
 
 
@@ -631,7 +699,6 @@ def school_performance_analysis(request):
     context = get_school_performance_context(request)
     return render(request, 'school/school_performance_analysis.html', context)
 
-
 def get_school_performance_context(request):
     """Generates school-wide performance analysis including departmental class performance."""
     print("🔍 Starting school performance context generation...")
@@ -699,20 +766,27 @@ def get_school_performance_context(request):
     print("🏫 Departmental class performance computed.")
 
     # 📚 Subject-wide averages (for bucket analysis)
-    subjects = defaultdict(list)
+    subject_marks = defaultdict(list)
     for mark in selected_marks:
-        subjects[mark.subject.name].append(float(mark.mark))
-    for subject, marks in subjects.items():
-        subjects[subject] = round(sum(marks) / len(marks), 2) if marks else "-"
+        subject_marks[mark.subject.name].append(float(mark.mark))
+
+    subjects = {
+        subject: round(sum(marks) / len(marks), 2) if marks else "-"
+        for subject, marks in subject_marks.items()
+    }
 
     # 🎯 Score buckets
-    all_scores = [score for score in subjects.values() if isinstance(score, (int, float))]
+    all_scores = [score for scores in subject_marks.values() for score in scores]
     score_buckets = {
-        "80-100": sum(1 for s in all_scores if s >= 80),
-        "55-79": sum(1 for s in all_scores if 55 <= s < 80),
+        "90-100": sum(1 for s in all_scores if 90 <= s <= 100),
+        "80-89": sum(1 for s in all_scores if 80 <= s < 90),
+        "70-79": sum(1 for s in all_scores if 70 <= s < 80),
+        "60-69": sum(1 for s in all_scores if 60 <= s < 70),
+        "55-59": sum(1 for s in all_scores if 55 <= s < 60),
         "50-54": sum(1 for s in all_scores if 50 <= s < 55),
-        "40-49": sum(1 for s in all_scores if 40 <= s < 50),
-        "0-39":  sum(1 for s in all_scores if s < 40),
+        "45-49": sum(1 for s in all_scores if 45 <= s < 50),
+        "40-44": sum(1 for s in all_scores if 40 <= s < 45),
+        "0-39": sum(1 for s in all_scores if s < 40),
     }
 
     # 📈 Term & Academic Trend
@@ -773,12 +847,16 @@ def get_school_performance_context(request):
         "selected_year": academic_year,
         "selected_term": selected_term,
 
-        "bucket_80_100": score_buckets["80-100"],
-        "bucket_55_79": score_buckets["55-79"],
-        "bucket_50_54": score_buckets["50-54"],
-        "bucket_40_49": score_buckets["40-49"],
-        "bucket_0_39": score_buckets["0-39"],
         "score_buckets": score_buckets,
+        "bucket_90_100": score_buckets["90-100"],
+        "bucket_80_89": score_buckets["80-89"],
+        "bucket_70_79": score_buckets["70-79"],
+        "bucket_60_69": score_buckets["60-69"],
+        "bucket_55_59": score_buckets["55-59"],
+        "bucket_50_54": score_buckets["50-54"],
+        "bucket_45_49": score_buckets["45-49"],
+        "bucket_40_44": score_buckets["40-44"],
+        "bucket_0_39": score_buckets["0-39"],
 
         "term_chart": {"labels": term_labels, "data": term_values},
         "year_chart": {"labels": year_labels, "data": year_values},
@@ -797,10 +875,11 @@ def download_school_performance_pdf(request):
     year = context['selected_year']
     term = context['selected_term']
     departments = context["departments"]
-    score_buckets = context['score_buckets']
     term_trend = context['term_trend']
     academic_trend = context['academic_trend']
     school_name = f"School: {request.user.school.name}"
+
+    score_buckets = context["score_buckets"]
 
     # --- Department-wise Tables + Charts ---
     for dept, dept_data in departments.items():
@@ -815,14 +894,11 @@ def download_school_performance_pdf(request):
         col_widths = [100] + [(A4[0] - 120) / (max_cols - 1)] * (max_cols - 1)
 
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ]))
+        table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),'...']))
+
         elements.extend([table, Spacer(1, 10)])
 
+        # Collecting scores for each class and subject
         subjects = list(dept_data["subjects"].keys())
         class_names = dept_data["all_classes"]
         data = []
@@ -855,25 +931,25 @@ def download_school_performance_pdf(request):
             img = Image(img_buffer, width=480, height=240)
             elements.extend([img, Spacer(1, 20)])
 
-    # --- Score Buckets ---
+    # --- Score Buckets Table ---
     elements.append(Paragraph("Score Distribution Buckets", subtitle_style))
     bucket_table_data = [
         ["Score Range", "Number of Students"],
-        ["80-100", score_buckets["80-100"]],
-        ["55-79", score_buckets["55-79"]],
+        ["90-100", score_buckets["90-100"]],
+        ["80-89", score_buckets["80-89"]],
+        ["70-79", score_buckets["70-79"]],
+        ["60-69", score_buckets["60-69"]],
+        ["55-59", score_buckets["55-59"]],
         ["50-54", score_buckets["50-54"]],
-        ["40-49", score_buckets["40-49"]],
+        ["45-49", score_buckets["45-49"]],
+        ["40-44", score_buckets["40-44"]],
         ["0-39", score_buckets["0-39"]],
     ]
     bucket_table = Table(bucket_table_data, colWidths=[120, 120])
-    bucket_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-    ]))
+    bucket_table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),'...']))
     elements.extend([bucket_table, Spacer(1, 20)])
 
-    # ✅ FIXED — Trend Table Helpers
+    # --- Trend Tables ---
     def wrap_labels_and_values(data_dict):
         keys = list(data_dict.keys())
         values = [str(v) for v in data_dict.values()]
@@ -893,11 +969,7 @@ def download_school_performance_pdf(request):
     term_data = wrap_labels_and_values(term_trend)
     term_col_widths = get_fixed_col_widths(term_trend)
     term_table = Table(term_data, colWidths=term_col_widths)
-    term_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-    ]))
+    term_table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),'...']))
     elements.extend([term_table, Spacer(1, 20)])
 
     # --- Year Trend Table ---
@@ -905,14 +977,10 @@ def download_school_performance_pdf(request):
     year_data = wrap_labels_and_values(academic_trend)
     year_col_widths = get_fixed_col_widths(academic_trend)
     year_table = Table(year_data, colWidths=year_col_widths)
-    year_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-    ]))
+    year_table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),'...']))
     elements.extend([year_table, Spacer(1, 20)])
 
-    # --- Header/Footer ---
+    # --- Header/Footer --- 
     def draw_custom_header(c, school_name, academic_year, term):
         page_width, page_height = A4
         banner_color = colors.HexColor("#f2f2f2")
@@ -928,25 +996,13 @@ def download_school_performance_pdf(request):
         c.drawCentredString(page_width / 2, page_height - 52, school_name)
 
         c.setFillColor(banner_color)
-        c.rect(0, page_height - 85, page_width, 25, fill=1, stroke=0)
+        c.rect(0, 0, page_width, 50, fill=1, stroke=0)
         c.setFillColor(text_color)
-        c.setFont("Helvetica-Bold", 10)
-        info_text = f"Academic Year: {academic_year}    |    Term: {term}"
-        c.drawCentredString(page_width / 2, page_height - 70, info_text)
+        c.setFont("Helvetica", 8)
+        c.drawCentredString(page_width / 2, 25, f"{academic_year} - {term} - School Performance")
 
-    def draw_footer(canvas, doc):
-        canvas.saveState()
-        canvas.setFont('Helvetica', 9)
-        canvas.drawCentredString(A4[0] / 2, 30, f"Page {doc.page}")
-        canvas.restoreState()
-
-    # --- Build PDF ---
-    doc.build(
-        elements,
-        onFirstPage=lambda c, d: [draw_custom_header(c, school_name, year, term), draw_footer(c, d)],
-        onLaterPages=draw_footer
-    )
-
+    doc.build(elements, onFirstPage=draw_custom_header, onLaterPages=draw_custom_header)
+    
     buffer.seek(0)
     safe_year = str(year).replace("/", "_")
     filename = f"{school_name}_Performance_{safe_year}_{term}.pdf"

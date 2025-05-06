@@ -80,27 +80,26 @@ def cis_registration(request):
 
 #------------ CIS DASHBOARD -----------------------
 
+from collections import defaultdict
+from statistics import mean
+
 @login_required
 def cis_dashboard(request):
     user = request.user
 
-    # Ensure only CIS users can access
     if user.role != "cis" or not user.district:
         return redirect("homepage")
 
     district = user.district
     schools_in_district = School.objects.filter(district=district)
 
-    # Get available academic years and terms
     filter_options = json.loads(get_available_terms(request).content)
     available_years = [year["name"] for year in filter_options.get("academic_years", [])]
     available_terms = [term["name"] for term in filter_options.get("terms", [])]
 
-    # Ensure correct academic year and term are extracted
     academic_year = request.GET.get("academic_year", "").strip()
     term = request.GET.get("term", "").strip()
 
-    # Ensure selected values are valid, else use defaults
     selected_year = academic_year if academic_year in available_years else filter_options.get("selected_academic_year")
     selected_term = term if term in available_terms else filter_options.get("selected_term", "Term 1")
 
@@ -111,73 +110,70 @@ def cis_dashboard(request):
             "terms": available_terms,
         })
 
-    # Apply filters correctly in queries for marks
     marks_qs = StudentMark.objects.filter(
-        student__school__in=schools_in_district,  # Filter by schools in the district
-        academic_year=selected_year,  # Filter by academic year
-        term=selected_term,  # Filter by term
-        subject__results__status="Submitted"  # Only include submitted results
-    ).distinct()
+        student__school__in=schools_in_district,
+        academic_year=selected_year,
+        term=selected_term,
+        subject__results__status="Submitted"
+    ).select_related("student__school", "subject")
 
-    # Dashboard Stats
+    # Manual distinct handling (to avoid over-counting due to joins)
+    seen = set()
+    cleaned_marks = []
+
+    for m in marks_qs:
+        key = (m.student.id, m.subject.id)
+        if key not in seen:
+            seen.add(key)
+            cleaned_marks.append({
+                "student_id": m.student.id,
+                "school_name": m.student.school.name,
+                "subject_name": m.subject.name,
+                "mark": m.mark
+            })
+
+    # === Stats ===
     total_schools = schools_in_district.count()
     total_teachers = sum(
         school.staff_members.filter(role__in=["teacher", "headteacher"]).count()
         for school in schools_in_district
     )
-    total_students_assessed = marks_qs.values('student').distinct().count()
-    total_district_average = marks_qs.aggregate(avg=Avg("mark"))["avg"] or 0
+    total_students_assessed = len(set(entry["student_id"] for entry in cleaned_marks))
+    total_district_average = round(mean([entry["mark"] for entry in cleaned_marks]), 2) if cleaned_marks else 0
 
-    # Best and weakest performing schools
-    best_performing_schools = list(
-        marks_qs.values("student__school__name")
-        .annotate(avg_mark=Avg("mark"))
-        .order_by("-avg_mark")[:5]
-    )
-    for school in best_performing_schools:
-        school["school"] = school.pop("student__school__name")
-        school["average_score"] = round(school.pop("avg_mark"), 2)
+    # === Grouped Averages ===
+    school_marks = defaultdict(list)
+    subject_marks = defaultdict(list)
 
-    weakest_performing_schools = list(
-        marks_qs.values("student__school__name")
-        .annotate(avg_mark=Avg("mark"))
-        .order_by("avg_mark")[:5]
-    )
-    for school in weakest_performing_schools:
-        school["school"] = school.pop("student__school__name")
-        school["average_score"] = round(school.pop("avg_mark"), 2)
+    for entry in cleaned_marks:
+        school_marks[entry["school_name"]].append(entry["mark"])
+        subject_marks[entry["subject_name"]].append(entry["mark"])
 
-    # Best and weakest performing subjects
-    best_performing_subjects = list(
-        marks_qs.values("subject__name")
-        .annotate(avg_mark=Avg("mark"))
-        .order_by("-avg_mark")[:5]
-    )
-    for subject in best_performing_subjects:
-        subject["subject"] = subject.pop("subject__name")
-        subject["average_score"] = round(subject.pop("avg_mark"), 2)
+    best_performing_schools = sorted([
+        {"school": school, "average_score": round(mean(marks), 2)}
+        for school, marks in school_marks.items()
+    ], key=lambda x: x["average_score"], reverse=True)[:5]
 
-    weakest_performing_subjects = list(
-        marks_qs.values("subject__name")
-        .annotate(avg_mark=Avg("mark"))
-        .order_by("avg_mark")[:5]
-    )
-    for subject in weakest_performing_subjects:
-        subject["subject"] = subject.pop("subject__name")
-        subject["average_score"] = round(subject.pop("avg_mark"), 2)
+    weakest_performing_schools = sorted([
+        {"school": school, "average_score": round(mean(marks), 2)}
+        for school, marks in school_marks.items()
+    ], key=lambda x: x["average_score"])[:5]
 
-    # Performance Trends Data
-    district_performance_trends = (
-        marks_qs.values("student__school__name")
-        .annotate(avg_mark=Avg("mark"))
-        .order_by("student__school__name")
-    )
+    best_performing_subjects = sorted([
+        {"subject": subject, "average_score": round(mean(marks), 2)}
+        for subject, marks in subject_marks.items()
+    ], key=lambda x: x["average_score"], reverse=True)[:5]
+
+    weakest_performing_subjects = sorted([
+        {"subject": subject, "average_score": round(mean(marks), 2)}
+        for subject, marks in subject_marks.items()
+    ], key=lambda x: x["average_score"])[:5]
+
     trend_data = [
-        {"school": entry["student__school__name"], "score": round(entry["avg_mark"], 2)}
-        for entry in district_performance_trends
+        {"school": school, "score": round(mean(marks), 2)}
+        for school, marks in school_marks.items()
     ]
 
-    # Filtered Notifications
     headteacher_results = Result.objects.filter(
         school__in=schools_in_district,
         academic_year=selected_year,
@@ -185,12 +181,10 @@ def cis_dashboard(request):
         status="Submitted"
     )
 
-    notifications = (
-        headteacher_results
-        .values("school__name", "school__headteacher__first_name", "school__headteacher__last_name", "term", "academic_year", "class_group__name", "subject__name")
-        .distinct()
-        .order_by("-academic_year", "-term")[:10]
-    )
+    notifications = headteacher_results.values(
+        "school__name", "school__headteacher__first_name", "school__headteacher__last_name",
+        "term", "academic_year", "class_group__name", "subject__name"
+    ).distinct().order_by("-academic_year", "-term")[:10]
 
     formatted_notifications = [
         f"{entry['school__headteacher__first_name']} {entry['school__headteacher__last_name']} submitted {entry['class_group__name']} {entry['subject__name']} results for {entry['school__name']} ({entry['term']} {entry['academic_year']})"
@@ -198,13 +192,12 @@ def cis_dashboard(request):
         if entry["school__headteacher__first_name"] and entry["school__headteacher__last_name"]
     ]
 
-    # Handle AJAX request correctly
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse({
             "total_schools": total_schools,
             "total_teachers": total_teachers,
             "total_students_assessed": total_students_assessed,
-            "total_district_average": round(total_district_average, 2),
+            "total_district_average": total_district_average,
             "best_performing_schools": best_performing_schools,
             "weakest_performing_schools": weakest_performing_schools,
             "best_performing_subjects": best_performing_subjects,
@@ -213,7 +206,6 @@ def cis_dashboard(request):
             "notifications": formatted_notifications,
         })
 
-    # Pass selected filters back to the template
     return render(request, "dashboards/cis_dashboard.html", {
         "academic_years": available_years,
         "terms": available_terms,
@@ -222,7 +214,7 @@ def cis_dashboard(request):
         "total_schools": total_schools,
         "total_teachers": total_teachers,
         "total_students_assessed": total_students_assessed,
-        "total_district_average": round(total_district_average, 2),
+        "total_district_average": total_district_average,
         "best_performing_schools": best_performing_schools,
         "weakest_performing_schools": weakest_performing_schools,
         "best_performing_subjects": best_performing_subjects,
@@ -234,6 +226,15 @@ def cis_dashboard(request):
 
 
 #------------ SISO DASHBOARD -----------------------
+
+from collections import defaultdict
+from statistics import mean
+from datetime import timedelta
+from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from django.http import JsonResponse
+import json
 
 @login_required
 def siso_dashboard(request):
@@ -251,11 +252,9 @@ def siso_dashboard(request):
     available_years = [year["name"] for year in filter_options.get("academic_years", [])]
     available_terms = [term["name"] for term in filter_options.get("terms", [])]
 
-    # Ensure correct academic year and term are extracted
     academic_year = request.GET.get("academic_year", "").strip()
     term = request.GET.get("term", "").strip()
 
-    # Ensure selected values are valid, else use defaults
     selected_year = academic_year if academic_year in available_years else filter_options.get("selected_academic_year")
     selected_term = term if term in available_terms else filter_options.get("selected_term", "Term 1")
 
@@ -266,73 +265,74 @@ def siso_dashboard(request):
             "terms": available_terms,
         })
 
-    # Apply filters correctly in queries for marks
+    # Get relevant marks with joins
     marks_qs = StudentMark.objects.filter(
-        student__school__in=schools_in_circuit,  # Filter by schools in the circuit
-        academic_year=selected_year,  # Filter by academic year
-        term=selected_term,  # Filter by term
-        subject__results__status="Submitted"  # Only include submitted results
-    ).distinct()
+        student__school__in=schools_in_circuit,
+        academic_year=selected_year,
+        term=selected_term,
+        subject__results__status="Submitted"
+    ).select_related("student__school", "subject")
 
-    # Dashboard Stats
+    # De-duplicate by student-subject pair
+    seen = set()
+    cleaned_marks = []
+    for m in marks_qs:
+        key = (m.student.id, m.subject.id)
+        if key not in seen:
+            seen.add(key)
+            cleaned_marks.append({
+                "student_id": m.student.id,
+                "school_name": m.student.school.name,
+                "subject_name": m.subject.name,
+                "mark": m.mark
+            })
+
+    # Dashboard stats
     total_schools = schools_in_circuit.count()
     total_teachers = sum(
         school.staff_members.filter(role__in=["teacher", "headteacher"]).count()
         for school in schools_in_circuit
     )
-    total_students_assessed = marks_qs.values('student').distinct().count()
-    total_circuit_average = marks_qs.aggregate(avg=Avg("mark"))["avg"] or 0
+    total_students_assessed = len(set(entry["student_id"] for entry in cleaned_marks))
+    total_circuit_average = round(mean([entry["mark"] for entry in cleaned_marks]), 2) if cleaned_marks else 0
 
-    # Best and weakest performing schools
-    best_performing_schools = list(
-        marks_qs.values("student__school__name")
-        .annotate(avg_mark=Avg("mark"))
-        .order_by("-avg_mark")[:2]
-    )
-    for school in best_performing_schools:
-        school["school"] = school.pop("student__school__name")
-        school["average_score"] = round(school.pop("avg_mark"), 2)
+    # Grouped averages
+    school_marks = defaultdict(list)
+    subject_marks = defaultdict(list)
 
-    weakest_performing_schools = list(
-        marks_qs.values("student__school__name")
-        .annotate(avg_mark=Avg("mark"))
-        .order_by("avg_mark")[:2]
-    )
-    for school in weakest_performing_schools:
-        school["school"] = school.pop("student__school__name")
-        school["average_score"] = round(school.pop("avg_mark"), 2)
+    for entry in cleaned_marks:
+        school_marks[entry["school_name"]].append(entry["mark"])
+        subject_marks[entry["subject_name"]].append(entry["mark"])
 
-    # Best and weakest performing subjects
-    best_performing_subjects = list(
-        marks_qs.values("subject__name")
-        .annotate(avg_mark=Avg("mark"))
-        .order_by("-avg_mark")[:3]
-    )
-    for subject in best_performing_subjects:
-        subject["subject"] = subject.pop("subject__name")
-        subject["average_score"] = round(subject.pop("avg_mark"), 2)
+    # Best/Worst Schools
+    best_performing_schools = sorted([
+        {"school": school, "average_score": round(mean(marks), 2)}
+        for school, marks in school_marks.items()
+    ], key=lambda x: x["average_score"], reverse=True)[:5]
 
-    weakest_performing_subjects = list(
-        marks_qs.values("subject__name")
-        .annotate(avg_mark=Avg("mark"))
-        .order_by("avg_mark")[:3]
-    )
-    for subject in weakest_performing_subjects:
-        subject["subject"] = subject.pop("subject__name")
-        subject["average_score"] = round(subject.pop("avg_mark"), 2)
+    weakest_performing_schools = sorted([
+        {"school": school, "average_score": round(mean(marks), 2)}
+        for school, marks in school_marks.items()
+    ], key=lambda x: x["average_score"])[:5]
 
-    # Performance Trends Data
-    circuit_performance_trends = (
-        marks_qs.values("student__school__name")
-        .annotate(avg_mark=Avg("mark"))
-        .order_by("student__school__name")
-    )
+    # Best/Worst Subjects
+    best_performing_subjects = sorted([
+        {"subject": subject, "average_score": round(mean(marks), 2)}
+        for subject, marks in subject_marks.items()
+    ], key=lambda x: x["average_score"], reverse=True)[:5]
+
+    weakest_performing_subjects = sorted([
+        {"subject": subject, "average_score": round(mean(marks), 2)}
+        for subject, marks in subject_marks.items()
+    ], key=lambda x: x["average_score"])[:5]
+
+    # Performance trend data
     trend_data = [
-        {"school": entry["student__school__name"], "score": round(entry["avg_mark"], 2)}
-        for entry in circuit_performance_trends
+        {"school": school, "score": round(mean(marks), 2)}
+        for school, marks in school_marks.items()
     ]
 
-    # Filtered Notifications
+    # Result submission notifications
     headteacher_results = Result.objects.filter(
         school__in=schools_in_circuit,
         academic_year=selected_year,
@@ -340,12 +340,10 @@ def siso_dashboard(request):
         status="Submitted"
     )
 
-    notifications = (
-        headteacher_results
-        .values("school__name", "school__headteacher__first_name", "school__headteacher__last_name", "term", "academic_year", "class_group__name", "subject__name")
-        .distinct()
-        .order_by("-academic_year", "-term")[:10]
-    )
+    notifications = headteacher_results.values(
+        "school__name", "school__headteacher__first_name", "school__headteacher__last_name",
+        "term", "academic_year", "class_group__name", "subject__name"
+    ).distinct().order_by("-academic_year", "-term")[:10]
 
     formatted_notifications = [
         f"{entry['school__headteacher__first_name']} {entry['school__headteacher__last_name']} submitted {entry['class_group__name']} {entry['subject__name']} results for {entry['school__name']} ({entry['term']} {entry['academic_year']})"
@@ -353,20 +351,14 @@ def siso_dashboard(request):
         if entry["school__headteacher__first_name"] and entry["school__headteacher__last_name"]
     ]
 
-    
-    # 🎯 Get the current result upload deadline for the school district
+    # Result deadline alert
     deadline_obj = ResultUploadDeadline.objects.filter(district=circuit.district).first()
 
-    # Prepare deadline status
     if deadline_obj:
         deadline_date = deadline_obj.deadline_date
         time_remaining = deadline_date - timezone.now().date()
 
-        # Set color based on the remaining time
-        if time_remaining <= timedelta(days=14):
-            notification_color = "danger"  # Red background for urgent deadlines
-        else:
-            notification_color = "info"  # Teal/Blue for other cases
+        notification_color = "danger" if time_remaining <= timedelta(days=14) else "info"
 
         deadline_status = {
             "status": notification_color,
@@ -375,14 +367,15 @@ def siso_dashboard(request):
         }
     else:
         deadline_status = None
+        time_remaining = None
 
-    # Handle AJAX request correctly
+    # AJAX handling
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse({
             "total_schools": total_schools,
             "total_teachers": total_teachers,
             "total_students_assessed": total_students_assessed,
-            "total_circuit_average": round(total_circuit_average, 2),
+            "total_circuit_average": total_circuit_average,
             "best_performing_schools": best_performing_schools,
             "weakest_performing_schools": weakest_performing_schools,
             "best_performing_subjects": best_performing_subjects,
@@ -390,10 +383,10 @@ def siso_dashboard(request):
             "performance_trends": trend_data,
             "notifications": formatted_notifications,
             "deadline_status": deadline_status,
-            "time_remaining": time_remaining.days if deadline_obj else None
+            "time_remaining": time_remaining.days if time_remaining else None,
         })
 
-    # Pass selected filters back to the template
+    # Template rendering
     return render(request, "dashboards/siso_dashboard.html", {
         "academic_years": available_years,
         "terms": available_terms,
@@ -402,7 +395,7 @@ def siso_dashboard(request):
         "total_schools": total_schools,
         "total_teachers": total_teachers,
         "total_students_assessed": total_students_assessed,
-        "total_circuit_average": round(total_circuit_average, 2),
+        "total_circuit_average": total_circuit_average,
         "best_performing_schools": best_performing_schools,
         "weakest_performing_schools": weakest_performing_schools,
         "best_performing_subjects": best_performing_subjects,
@@ -411,9 +404,6 @@ def siso_dashboard(request):
         "notifications": formatted_notifications,
         "deadline_status": deadline_status,
     })
-
-
-
 
 
 #--------------- HEADTEACHER DASHBOARD -----------------
@@ -733,6 +723,14 @@ def class_teacher_dashboard(request):
 
 
 
+from datetime import timedelta
+from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect, render
+from django.http import JsonResponse
+from django.db.models import Avg
+import json
+
 @login_required
 def subject_teacher_dashboard(request):
     user = request.user
@@ -774,9 +772,8 @@ def subject_teacher_dashboard(request):
     if term:
         student_marks = student_marks.filter(term=term)
 
-
     total_students_assessed = student_marks.count()
-    average_class_performance = student_marks.aggregate(avg_mark=Avg("mark"))["avg_mark"] or 0
+    average_class_performance = round(student_marks.aggregate(avg_mark=Avg("mark"))["avg_mark"] or 0, 2)
 
     # Best and weakest students
     best_students = (
@@ -811,7 +808,6 @@ def subject_teacher_dashboard(request):
         else:
             score_buckets["0-39"] += 1
 
-        
     # 🎯 Get the current result upload deadline for the school district
     deadline_obj = ResultUploadDeadline.objects.filter(district=teacher.school.district).first()
 
@@ -833,13 +829,24 @@ def subject_teacher_dashboard(request):
         }
     else:
         deadline_status = None
+        time_remaining = None
 
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return JsonResponse({
             "total_students_assessed": total_students_assessed,
-            "average_class_performance": round(average_class_performance, 2),
-            "best_students": [{"name": f"{s['student__first_name']} {s['student__last_name']}", "mark": s["avg_mark"]} for s in best_students],
-            "weakest_students": [{"name": f"{s['student__first_name']} {s['student__last_name']}", "mark": s["avg_mark"]} for s in weakest_students],
+            "average_class_performance": average_class_performance,
+            "best_students": [
+                {
+                    "name": f"{s['student__first_name']} {s['student__last_name']}",
+                    "mark": round(s["avg_mark"], 2)
+                } for s in best_students
+            ],
+            "weakest_students": [
+                {
+                    "name": f"{s['student__first_name']} {s['student__last_name']}",
+                    "mark": round(s["avg_mark"], 2)
+                } for s in weakest_students
+            ],
             "performance_distribution": score_buckets,
             "deadline_status": deadline_status,
             "time_remaining": time_remaining.days if deadline_obj else None

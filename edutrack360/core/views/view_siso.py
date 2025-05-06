@@ -165,8 +165,6 @@ def circuit_performance_analysis(request):
 
 
 def get_circuit_performance_context(request):
-    """Generates circuit-wide performance analysis for SISO, including departmental breakdowns and trends."""
-
     print("🔍 Starting circuit performance context generation...")
 
     # Load filters
@@ -187,29 +185,25 @@ def get_circuit_performance_context(request):
     schools_in_circuit = School.objects.filter(circuit=user.circuit)
     print(f"🏫 Schools found in circuit: {schools_in_circuit.count()}")
 
-    # Query for selected marks
     selected_marks = StudentMark.objects.filter(
-        student__school__in=schools_in_circuit,  # Filter by schools in the circuit
-        academic_year=academic_year,  # Filter by academic year
-        term=selected_term,  # Filter by term
-        subject__results__status="Submitted"  # Only include submitted results
-    ).distinct()
-    
+        student__school__in=schools_in_circuit,
+        academic_year=academic_year,
+        term=selected_term,
+        subject__results__status="Submitted"
+    ).select_related("student__school", "student__class_group", "subject")
 
-    print("🧾 Total submitted marks fetched:", selected_marks.count())
+    selected_marks = deduplicate_marks(selected_marks)
 
-    # Initialize dictionaries for breakdowns
+    print("🧾 Total submitted marks fetched:", len(selected_marks))
+
     school_departments = {}
     school_subject_averages = {}
     school_subjects = {}
-    school_score_buckets = {}
     school_chart_data = {}
 
-    # Calculate school-level averages using aggregate (same as in siso_dashboard)
     for school in schools_in_circuit:
-        school_marks = selected_marks.filter(student__school_id=school.id)
-        
-        # Calculate department and subject breakdowns as before
+        school_marks = [m for m in selected_marks if m.student.school_id == school.id]
+
         dept_structure = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
         for mark in school_marks:
             subject = mark.subject
@@ -245,16 +239,6 @@ def get_circuit_performance_context(request):
         for subject, marks in subjects.items():
             subjects[subject] = round(sum(marks) / len(marks), 2) if marks else "-"
 
-        all_scores = [score for score in subjects.values() if isinstance(score, (int, float))]
-        score_buckets = {
-            "80-100": sum(1 for s in all_scores if s >= 80),
-            "55-79": sum(1 for s in all_scores if 55 <= s < 80),
-            "50-54": sum(1 for s in all_scores if 50 <= s < 55),
-            "40-49": sum(1 for s in all_scores if 40 <= s < 50),
-            "0-39":  sum(1 for s in all_scores if s < 40),
-        }
-
-        # 🎯 Chart data
         chart_data_per_school = {}
         for dept_name, dept_data in departments.items():
             subject_charts = []
@@ -270,16 +254,13 @@ def get_circuit_performance_context(request):
                 "datasets": subject_charts
             }
 
-        # 🔒 Store per school
         school_departments[school.name] = departments
         school_subject_averages[school.name] = subject_averages
         school_subjects[school.name] = subjects
-        school_score_buckets[school.name] = score_buckets
         school_chart_data[school.name] = chart_data_per_school
 
     print("📊 Per-school breakdowns and charts generated.")
 
-    # 📈 Circuit-level trends
     base_year = int(academic_year.split("/")[0])
     prev_1 = f"{base_year - 1}/{base_year}"
     prev_2 = f"{base_year - 2}/{base_year - 1}"
@@ -297,15 +278,15 @@ def get_circuit_performance_context(request):
     for term, year in term_sequence:
         q_terms |= Q(term=term, academic_year=year)
 
-    # Fetch all marks that match the terms in the sequence
     trend_marks = StudentMark.objects.filter(
         student__school__in=schools_in_circuit
-    ).filter(q_terms, subject__results__status="Submitted")
+    ).filter(q_terms, subject__results__status="Submitted").select_related("student", "subject")
+
+    trend_marks = deduplicate_marks(trend_marks)
 
     term_aggregates = {key: [] for key in term_keys}
     year_aggregates = {year: [] for year in academic_years}
 
-    # Calculate term and year aggregates for trend marks
     for mark in trend_marks:
         score = float(mark.mark)
         key = f"{mark.term} ({mark.academic_year})"
@@ -314,35 +295,72 @@ def get_circuit_performance_context(request):
         if mark.academic_year in year_aggregates:
             year_aggregates[mark.academic_year].append(score)
 
-    # Calculate term and academic year trends (average) using aggregate method
     term_trend = {
-        "Circuit": user.circuit.name,
+        "School": "Circuit",
         **{key: round(sum(v) / len(v), 2) if v else "-" for key, v in term_aggregates.items()}
     }
+
     academic_trend = {
-        "Circuit": user.circuit.name,
+        "School": "Circuit",
         **{year: round(sum(v) / len(v), 2) if v else "-" for year, v in year_aggregates.items()}
     }
 
-    # Prepare data for charts
-    term_labels = list(term_trend.keys())[1:]
-    term_values = [float(val) if isinstance(val, (int, float)) else None for val in list(term_trend.values())[1:]]
-    year_labels = list(academic_trend.keys())[1:]
-    year_values = [float(val) if isinstance(val, (int, float)) else None for val in list(academic_trend.values())[1:]]
+    school_term_trends = {}
+    for school in schools_in_circuit:
+        school_marks = [m for m in trend_marks if m.student.school_id == school.id]
+        aggregates = {key: [] for key in term_keys}
+        for mark in school_marks:
+            key = f"{mark.term} ({mark.academic_year})"
+            if key in aggregates:
+                aggregates[key].append(float(mark.mark))
+        school_term_trends[school.name] = {
+            "School": school.name,
+            **{k: round(sum(v) / len(v), 2) if v else "-" for k, v in aggregates.items()}
+        }
+
+    term_labels = term_keys
+    year_labels = academic_years
+
+    term_values = [float(term_trend[k]) if isinstance(term_trend[k], (int, float)) else None for k in term_labels]
+    year_values = [float(academic_trend[y]) if isinstance(academic_trend[y], (int, float)) else None for y in year_labels]
+
+    term_chart_datasets = [
+        {
+            "label": school_data["School"],
+            "data": [school_data[k] if isinstance(school_data[k], (int, float)) else None for k in term_labels]
+        }
+        for school_data in school_term_trends.values()
+    ]
+    term_chart_datasets.append({
+        "label": "Circuit",
+        "data": term_values
+    })
 
     print("✅ Circuit-wide trends generated successfully.")
 
     return {
-        "school_departments": school_departments,  # Correct context
+        "school_departments": school_departments,
         "school_subject_averages": school_subject_averages,
         "school_subjects": school_subjects,
-        "school_score_buckets": school_score_buckets,
         "school_chart_data": school_chart_data,
 
         "term_trend": term_trend,
         "academic_trend": academic_trend,
-        "term_chart": {"labels": term_labels, "data": term_values},
-        "year_chart": {"labels": year_labels, "data": year_values},
+        "school_term_trends": list(school_term_trends.values()),
+
+        "term_chart": {
+            "labels": term_labels,
+            "datasets": term_chart_datasets
+        },
+        "year_chart": {
+            "labels": year_labels,
+            "datasets": [
+                {
+                    "label": "Circuit",
+                    "data": year_values
+                }
+            ]
+        },
 
         "terms": all_terms,
         "academic_years": valid_years,
@@ -351,7 +369,15 @@ def get_circuit_performance_context(request):
     }
 
 
-
+def deduplicate_marks(marks_queryset):
+    seen = set()
+    result = []
+    for m in marks_queryset:
+        key = (m.student.id, m.subject.id)
+        if key not in seen:
+            seen.add(key)
+            result.append(m)
+    return result
 
 
 @login_required

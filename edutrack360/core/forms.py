@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import PasswordResetForm
 from core.models import (
     Circuit, School, Subject, ClassGroup, Result, Teacher, 
-    Notification, School, Circuit, Department
+    Notification, School, Circuit, Department, District,
 
 )
 from django.contrib.auth.forms import UserCreationForm
@@ -53,8 +53,9 @@ class AddSchoolForm(forms.ModelForm):
         # Safety check for circuit tampering
         circuit = cleaned_data.get('circuit')
         if circuit and hasattr(self.request.user, 'district'):
-            if circuit.district != self.request.user.assigned_district:
+            if circuit.district != self.request.user.district:
                 raise ValidationError("Selected circuit does not belong to your district.")
+
 
         # Duplicate school code check
         school_code = cleaned_data.get('school_code')
@@ -137,108 +138,6 @@ class TeacherRegistrationForm(UserCreationForm):
             user.save()
             Teacher.objects.create(user=user, school=self.school)  
         return user
-
-
-class UserRegistrationForm(UserCreationForm):
-    staff_id = forms.IntegerField()
-    license_number = forms.CharField(max_length=50)
-    first_name = forms.CharField(max_length=50)
-    last_name = forms.CharField(max_length=50)
-    email = forms.EmailField()
-    phone_number = forms.CharField(
-        max_length=15,
-        validators=[RegexValidator(r'^\+?1?\d{9,15}$', 'Enter a valid phone number.')],
-    )
-    role = forms.ChoiceField(choices=User.ROLE_CHOICES)
-
-    class Meta:
-        model = User
-        fields = [
-            "staff_id", "license_number", "first_name", "last_name",
-            "email", "phone_number", "password1", "password2", "role"
-        ]
-
-    def __init__(self, *args, **kwargs):
-        # Get the district from the logged-in CIS user
-        self.district = kwargs.pop("district", None)
-        self.school = kwargs.pop("school", None)
-        self.circuit = kwargs.pop("circuit", None)
-        super().__init__(*args, **kwargs)
-
-        # Only create the fields if the district is present
-        if self.district:
-            self.fields['circuit'] = forms.ModelChoiceField(
-                queryset=Circuit.objects.filter(district=self.district),
-                required=False,
-                label="Assign Circuit",
-                widget=forms.Select(attrs={'class': 'form-control'})
-            )
-            self.fields['school'] = forms.ModelChoiceField(
-                queryset=School.objects.filter(circuit__district=self.district),
-                required=False,
-                label="Assign School",
-                widget=forms.Select(attrs={'class': 'form-control'})
-            )
-
-        self.fields['role'].widget.attrs.update({'class': 'form-control'})
-
-    def clean(self):
-        cleaned_data = super().clean()
-        role = cleaned_data.get('role')
-        school = cleaned_data.get('school')
-        circuit = cleaned_data.get('circuit')
-
-        # Removed district validation since it is inherited from the logged-in user
-        if role not in dict(User.ROLE_CHOICES):
-            raise forms.ValidationError("Invalid role selected.")
-
-        if role == 'headteacher' and not school:
-            self.add_error('school', "School is required for Headteacher role.")
-        if role == 'siso' and not circuit:
-            self.add_error('circuit', "Circuit is required for SISO role.")
-
-        return cleaned_data
-
-    def save(self, commit=True):
-        user = super().save(commit=False)
-
-        # Set the district inherited from the logged-in CIS user
-        user.district = self.district  # This should come from the view or session
-
-        user.role = self.cleaned_data['role']
-        user.staff_id = self.cleaned_data['staff_id']
-        user.license_number = self.cleaned_data['license_number']
-        user.phone_number = self.cleaned_data['phone_number']
-
-        # Clean up any associations just in case
-        user.school = None
-        user.circuit = None
-
-        # Assign school/circuit based on the role
-        if user.role == 'headteacher':
-            assigned_school = self.cleaned_data.get('school')
-            user.school = assigned_school
-        elif user.role == 'siso':
-            assigned_circuit = self.cleaned_data.get('circuit')
-            user.circuit = assigned_circuit
-        elif user.role == 'teacher':
-            user.school = self.school
-
-        if commit:
-            user.save()
-
-            # Set reverse relationship: assign the user as siso/headteacher
-            if user.role == 'headteacher' and user.school:
-                user.school.headteacher = user
-                user.school.save()
-            elif user.role == 'siso' and user.circuit:
-                user.circuit.siso = user
-                user.circuit.save()
-
-        return user
-
-
-
 
 
 class NotificationForm(forms.ModelForm):

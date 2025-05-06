@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Class Management</title>
+    <title>Admin Dashboard</title>
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
     <link rel="icon" type="image/png" href="{% static 'edu favicon.png' %}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -136,16 +136,24 @@
                 <span id="notificationDot" class="position-absolute top-0 start-100 translate-middle badge rounded-circle bg-danger d-none" style="width: 10px; height: 10px; padding: 0;"></span>
             </div>
             
-            <!-- User Icon with Dropdown -->
-            <div class="user-dropdown-wrapper position-relative" style="display: inline-block;">
-                <i class="fas fa-user-circle" id="userIcon" style="cursor: pointer;"></i>
-                
-                <!-- Dropdown -->
-                <div id="userDropdown" class="user-dropdown position-absolute end-0 mt-2 d-none">
-                    <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span class="tooltip">Logout</span>
-                    </a>
+            <!-- User Profile Dropdown Template -->
+            <div class="dropdown user-dropdown-wrapper position-relative">
+                <!-- User Icon -->
+                <a href="#" class="dropdown-toggle text-decoration-none" id="userIcon" role="button" aria-expanded="false" tabindex="0">
+                    <i class="fas fa-user-circle fa-lg"></i>
+                </a>
+            
+                <!-- Dropdown Menu -->
+                <div class="dropdown-menu dropdown-menu-end user-dropdown d-none" id="userDropdown" role="menu">
+                    <ul class="list-unstyled mb-0" id="dropdownMenu">
+                        <li class="dropdown-item" tabindex="0">Profile</li>
+                        <li class="dropdown-item" tabindex="0">Account Settings</li>
+                        <li class="dropdown-item logout" tabindex="0">
+                            <a href="#" id="logoutBtn" data-logout-url="{% url 'logout' %}" class="logout-link text-danger">
+                                <i class="fas fa-sign-out-alt me-2"></i> Logout
+                            </a>
+                        </li>
+                    </ul>
                 </div>
             </div>
             
@@ -231,6 +239,7 @@
         </div>
     </div>
     
+    <!-- Logout Confirmation Modal -->
     <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered custom-modal">
             <div class="modal-content text-center p-4 shadow-sm rounded-4 border-0">
@@ -263,37 +272,86 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        
-        document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("DOMContentLoaded", () => {
+            // Logout Modal
             const logoutBtn = document.getElementById("logoutBtn");
             const confirmLogout = document.getElementById("confirmLogout");
-            const logoutUrl = logoutBtn.getAttribute("data-logout-url");
-    
+            const logoutUrl = logoutBtn?.getAttribute("data-logout-url");
             const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
-    
-            logoutBtn.addEventListener("click", function (e) {
+
+            logoutBtn?.addEventListener("click", (e) => {
                 e.preventDefault();
                 logoutModal.show();
             });
-    
-            confirmLogout.addEventListener("click", function () {
-                window.location.href = logoutUrl;
+
+            confirmLogout?.addEventListener("click", () => {
+                if (logoutUrl) window.location.href = logoutUrl;
+            });
+
+            // User Dropdown
+            const userIcon = document.getElementById("userIcon");
+            const userDropdown = document.getElementById("userDropdown");
+            const dropdownItems = userDropdown?.querySelectorAll(".dropdown-item") || [];
+            let activeIndex = -1;
+
+            const toggleDropdown = () => {
+                userDropdown.classList.toggle("show");
+                userDropdown.classList.toggle("d-none");
+                activeIndex = -1;
+                clearDropdownActive();
+            };
+
+            const clearDropdownActive = () => {
+                dropdownItems.forEach(item => item.classList.remove("active"));
+            };
+
+            const focusItem = (index) => {
+                clearDropdownActive();
+                activeIndex = index;
+                dropdownItems[activeIndex]?.classList.add("active");
+                dropdownItems[activeIndex]?.focus();
+            };
+
+            userIcon?.addEventListener("click", (e) => {
+                e.preventDefault();
+                toggleDropdown();
+            });
+
+            userIcon?.addEventListener("keydown", (e) => {
+                if (["Enter", "ArrowDown"].includes(e.key)) {
+                    e.preventDefault();
+                    userDropdown.classList.add("show");
+                    userDropdown.classList.remove("d-none");
+                    focusItem(0);
+                }
+            });
+
+            userDropdown?.addEventListener("keydown", (e) => {
+                if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    focusItem((activeIndex + 1) % dropdownItems.length);
+                } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    focusItem((activeIndex - 1 + dropdownItems.length) % dropdownItems.length);
+                } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    dropdownItems[activeIndex]?.click();
+                } else if (e.key === "Escape") {
+                    userDropdown.classList.remove("show");
+                    userDropdown.classList.add("d-none");
+                    clearDropdownActive();
+                }
+            });
+
+            window.addEventListener("click", (e) => {
+                if (!e.target.closest(".user-dropdown-wrapper")) {
+                    userDropdown.classList.remove("show");
+                    userDropdown.classList.add("d-none");
+                    clearDropdownActive();
+                }
             });
         });
-        
-        const userIcon = document.getElementById('userIcon');
-        const userDropdown = document.getElementById('userDropdown');
-
-        userIcon.addEventListener('click', () => {
-            userDropdown.classList.toggle('d-none');
-        });
-
-        // Optional: Close dropdown when clicking outside
-        window.addEventListener('click', (e) => {
-            if (!e.target.closest('.user-dropdown-wrapper')) {
-                userDropdown.classList.add('d-none');
-            }
-        });
     </script>
+
 </body>
 </html>
