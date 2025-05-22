@@ -19,7 +19,8 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from core.views.view_common import (
-    homepage, unified_login, logout_view, admin_login,
+    homepage, unified_login, logout_view, 
+    admin_login, healthz
 )
 from django.contrib.auth import views as auth_views
 
@@ -30,6 +31,7 @@ urlpatterns = [
 
     path('login/user/', unified_login, name='login'),
     path('logout/', logout_view, name='logout'),
+    path('healthz/', healthz, name='healthz'),
 
 
     # --- DASHBOARD ROUTES ---

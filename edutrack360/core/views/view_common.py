@@ -153,3 +153,11 @@ class CustomPasswordResetConfirmView(PasswordResetConfirmView):
 # Password reset complete view
 class CustomPasswordResetCompleteView(PasswordResetCompleteView):
     template_name = 'commons/password_reset_complete.html'
+
+
+
+from django.http import JsonResponse
+
+def healthz(request):
+    return JsonResponse({'status': 'ok'})
+
