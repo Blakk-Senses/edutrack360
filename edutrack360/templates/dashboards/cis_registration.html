@@ -239,7 +239,6 @@
         </div>
     </div>
     
-    <!-- Logout Confirmation Modal -->
     <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered custom-modal">
             <div class="modal-content text-center p-4 shadow-sm rounded-4 border-0">
@@ -261,31 +260,29 @@
                                     Logout
                                 </button>
                             </div>
-                            
                         </div>
-                        
                     </div>
-                    
                 </div>                
             </div>
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
             // Logout Modal
+        document.addEventListener("DOMContentLoaded", function () {
             const logoutBtn = document.getElementById("logoutBtn");
             const confirmLogout = document.getElementById("confirmLogout");
-            const logoutUrl = logoutBtn?.getAttribute("data-logout-url");
+            const logoutUrl = logoutBtn.getAttribute("data-logout-url");
+    
             const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
-
-            logoutBtn?.addEventListener("click", (e) => {
+    
+            logoutBtn.addEventListener("click", function (e) {
                 e.preventDefault();
                 logoutModal.show();
             });
-
-            confirmLogout?.addEventListener("click", () => {
-                if (logoutUrl) window.location.href = logoutUrl;
+    
+            confirmLogout.addEventListener("click", function () {
+                window.location.href = logoutUrl;
             });
 
             // User Dropdown

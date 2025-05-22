@@ -265,12 +265,17 @@ body {
     font-size: 22px;
 }
 
+.user-dropdown-wrapper {
+    position: relative;
+}
+
+/* Base Dropdown Style */
 .user-dropdown {
     opacity: 0;
     transform: translateY(-10px);
     transition: opacity 0.3s ease, transform 0.3s ease;
     pointer-events: none;
-    display: block !important; /* keep structure, but hidden */
+    display: block !important; /* Keep structure but hidden */
     position: absolute;
     top: 100%;
     right: 0;
@@ -280,15 +285,44 @@ body {
     border-radius: 0.5rem;
     padding: 0.5rem 0;
     min-width: 200px;
+    max-width: 90vw; /* Prevent overflow */
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+    overflow-wrap: break-word;
 }
 
+/* Show dropdown when active */
 .user-dropdown.show {
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
 }
 
+/* Small screens (tablets) */
+@media (max-width: 768px) {
+    .user-dropdown {
+        min-width: 160px;
+        max-width: 90vw;
+        top: 110%; /* Slightly more space below trigger */
+        right: 0;
+    }
+}
+
+/* Extra small screens (mobile phones) */
+@media (max-width: 480px) {
+    .user-dropdown {
+        position: fixed; /* Avoid issues with nested parents */
+        top: 60px; /* Adjust as needed to appear below nav */
+        left: 0;
+        right: 0;
+        margin: 0 auto;
+        min-width: 100vw;
+        border-radius: 0 0 0.5rem 0.5rem;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+        padding: 0.75rem 1rem;
+    }
+}
+
+/* Dropdown item styling */
 .dropdown-item {
     padding: 0.5rem 1rem;
     cursor: pointer;
@@ -298,8 +332,10 @@ body {
 .dropdown-item.active {
     background-color: #027166;
     font-weight: bold;
+    color: white;
 }
 
+/* Logout link */
 .logout-link {
     text-decoration: none;
     color: #dc3545;
@@ -308,6 +344,8 @@ body {
 .logout-link:hover {
     text-decoration: underline;
 }
+
+
 
 .btn {
     background: none;

@@ -70,66 +70,68 @@
     <div class="container mt-5">
         <h2 class="mb-4">Uploaded Result Files</h2>
 
-        <table class="table table-bordered table-hover align-middle">
-            <thead class="table-dark">
-                <tr>
-                    <th>Academic Year</th>
-                    <th>Term</th>
-                    <th>Class</th>
-                    <th>Subject</th>
-                    <th>Latest Upload</th>
-                    <th>Status</th>
-                    <th style="min-width: 220px;">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for file in page_obj %}
-                <tr>
-                    <td>{{ file.academic_year }}</td>
-                    <td>{{ file.term }}</td>
-                    <td>{{ file.class_group__name }}</td>
-                    <td>{{ file.subject__name }}</td>
-                    <td>{{ file.latest_upload|date:"d M Y H:i" }}</td>
-                    <td>
-                        {% if file.status == "Submitted" %}
-                            <span class="badge bg-success">{{ file.status }}</span>
-                        {% elif file.status == "Queried" %}
-                            <span class="badge bg-danger">{{ file.status }}</span>
-                        {% else %}
-                            <span class="badge bg-secondary">{{ file.status }}</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if file.status != "Queried" %}
-                            <a href="{% url 'school:headteacher_view_result' file.year_slug file.term_slug file.subject__id file.class_group__id %}"
-                               class="btn btn-sm btn-outline-primary">View</a>
-                        {% else %}
-                            <button class="btn btn-sm btn-outline-secondary" disabled>View</button>
-                        {% endif %}
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Academic Year</th>
+                        <th>Term</th>
+                        <th>Class</th>
+                        <th>Subject</th>
+                        <th>Latest Upload</th>
+                        <th>Status</th>
+                        <th style="min-width: 220px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for file in page_obj %}
+                    <tr>
+                        <td>{{ file.academic_year }}</td>
+                        <td>{{ file.term }}</td>
+                        <td>{{ file.class_group__name }}</td>
+                        <td>{{ file.subject__name }}</td>
+                        <td>{{ file.latest_upload|date:"d M Y H:i" }}</td>
+                        <td>
+                            {% if file.status == "Submitted" %}
+                                <span class="badge bg-success">{{ file.status }}</span>
+                            {% elif file.status == "Queried" %}
+                                <span class="badge bg-danger">{{ file.status }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ file.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if file.status != "Queried" %}
+                                <a href="{% url 'school:headteacher_view_result' file.year_slug file.term_slug file.subject__id file.class_group__id %}"
+                                class="btn btn-sm btn-outline-primary">View</a>
+                            {% else %}
+                                <button class="btn btn-sm btn-outline-secondary" disabled>View</button>
+                            {% endif %}
 
-                        {% if file.status == "Pending" %}
-                            <form action="{% url 'school:submit_result' %}" method="POST" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="year" value="{{ file.year_slug }}">
-                                <input type="hidden" name="term" value="{{ file.term_slug }}">
-                                <input type="hidden" name="subject_id" value="{{ file.subject__id }}">
-                                <input type="hidden" name="class_id" value="{{ file.class_group__id }}">
-                                <button type="submit" class="btn btn-sm btn-success">Submit</button>
-                            </form>
+                            {% if file.status == "Pending" %}
+                                <form action="{% url 'school:submit_result' %}" method="POST" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="year" value="{{ file.year_slug }}">
+                                    <input type="hidden" name="term" value="{{ file.term_slug }}">
+                                    <input type="hidden" name="subject_id" value="{{ file.subject__id }}">
+                                    <input type="hidden" name="class_id" value="{{ file.class_group__id }}">
+                                    <button type="submit" class="btn btn-sm btn-success">Submit</button>
+                                </form>
 
-                            <button type="button"
-                                    class="btn btn-sm btn-warning"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#queryModal"
-                                    onclick="setQueryData('{{ file.year_slug }}', '{{ file.term_slug }}', '{{ file.subject__id }}', '{{ file.class_group__id }}')">
-                                Query
-                            </button>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                                <button type="button"
+                                        class="btn btn-sm btn-warning"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#queryModal"
+                                        onclick="setQueryData('{{ file.year_slug }}', '{{ file.term_slug }}', '{{ file.subject__id }}', '{{ file.class_group__id }}')">
+                                    Query
+                                </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
         <!-- Pagination -->
         <nav>

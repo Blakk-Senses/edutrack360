@@ -129,6 +129,26 @@
             }
         }
 
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        /* Mobile-specific improvements */
+        @media (max-width: 576px) {
+            .action-buttons {
+                flex-direction: column;
+                align-items: stretch; /* Make buttons full width */
+                gap: 0.4rem;
+            }
+
+            .action-buttons .btn {
+                width: 100%;
+                font-size: 0.875rem;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -179,11 +199,13 @@
               <td>{{ file.total_entries }}</td>
               <td>{{ file.latest_upload|date:"Y-m-d H:i" }}</td>
               <td>
-                <a class="btn btn-sm btn-primary"
-                  href="{% url 'teacher:view_result_entries' file.year_slug file.term_slug file.subject__id file.class_group__id %}">
-                  View
-                </a>
-                <button class="btn btn-sm btn-danger delete-file-btn">Delete</button>
+                <div class="action-buttons">
+                  <a class="btn btn-sm btn-primary"
+                    href="{% url 'teacher:view_result_entries' file.year_slug file.term_slug file.subject__id file.class_group__id %}">
+                    View
+                  </a>
+                  <button class="btn btn-sm btn-danger delete-file-btn">Delete</button>
+                </div>
               </td>
             </tr>
           {% empty %}

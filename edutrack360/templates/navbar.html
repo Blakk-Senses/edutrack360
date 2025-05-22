@@ -1,89 +1,306 @@
 <style>
-    .user-menu {
-        position: relative;
-        display: inline-block;
-        font-family: 'Segoe UI', sans-serif;
-    }
-    
-    .user-info {
-        display: flex;
-        align-items: center;
-        cursor: pointer;
-        padding: 10px;
-    }
-    
-    .username {
-        margin-right: 10px;
-        font-size: 14px;
-        color: #444;
-    }
-    
-    .avatar {
-        width: 35px;
-        height: 35px;
-        border-radius: 50%;
-        object-fit: cover;
-    }
-    
-    .dropdown-menu {
-        display: none;
-        position: absolute;
-        top: 50px;
-        right: 0;
-        background: white;
-        box-shadow: 0px 3px 12px rgba(0, 0, 0, 0.15);
-        border-radius: 5px;
-        overflow: hidden;
-        z-index: 999;
-    }
-    
-    .dropdown-menu ul {
-        list-style: none;
+    body {
+        font-family: 'Calibri', sans-serif;
         margin: 0;
-        padding: 0;
+        background-color: #e0f7fa;
+        padding-top: 50px;
     }
-    
-    .dropdown-menu li {
-        padding: 12px 20px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: background 0.3s ease;
-    }
-    
-    .dropdown-menu li:hover {
-        background: #f0f0f0;
-    }
-    
-    .dropdown-menu li.active {
-        background: #4cd964;
-        color: white;
-    }
-    
-    .dropdown-menu li.logout {
-        border-top: 1px solid #eee;
-        font-weight: bold;
-    }
-</Style>  
 
-<div class="user-menu">
-    <div class="user-info" onclick="toggleMenu()">
-        <span class="username">ROBIN WILLIS</span>
-        <img src="user-avatar.jpg" alt="User Avatar" class="avatar">
-    </div>
-    <div class="dropdown-menu" id="dropdownMenu">
-        <ul>
-            <li>Settings</li>
-            <li class="active">Profile</li>
-            <li class="logout">Logout</li>
-        </ul>
-    </div>
-</div>
-<script>
-    function toggleMenu() {
-        const menu = document.getElementById('dropdownMenu');
-        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    .navbar {
+        background-color: #003a3b;
+        color: white;
+        position: fixed;
+        width: 100%;
+        top: 0;
+        z-index: 1000;
+        padding: 10px 20px;
+    }
+
+    .logo-img {
+        max-width: 120px;
+        height: auto;
+    }
+
+    .container {
+        margin: 20px 0 0 100px;
+        padding: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .container {
+            margin-left: 60px;
         }
 
-</script>
-  
-  
+        .responsive-shrink-table {
+            font-size: 0.875rem;
+        }
+
+        .responsive-shrink-table th,
+        .responsive-shrink-table td {
+            padding: 0.5rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .container {
+            margin-left: 0;
+        }
+
+        .logo-img {
+            max-width: 90px;
+        }
+
+        .responsive-shrink-table {
+            font-size: 0.6rem;
+        }
+
+        .responsive-shrink-table th,
+        .responsive-shrink-table td {
+            white-space: normal;
+            word-break: break-word;
+            text-align: center;
+        }
+
+        .responsive-shrink-table th {
+            font-weight: 600;
+        }
+    }
+
+    .card {
+        border-radius: 10px;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .text-center {
+        color: rgb(1, 107, 107);
+    }
+
+    /* 📱 Scroll Snap Wrapper */
+    .scroll-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x mandatory;
+        scroll-padding: 1rem;
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 8px;
+    }
+
+    .scroll-wrapper > * {
+        scroll-snap-align: start;
+    }
+
+    /* 📊 Responsive Table Styling */
+    .responsive-shrink-table {
+        min-width: 600px;
+        width: max-content;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .responsive-shrink-table th,
+    .responsive-shrink-table td {
+        padding: 0.75rem;
+        vertical-align: middle;
+    }
+
+    /* Sticky Header and First Column */
+    thead th,
+    .responsive-shrink-table th:first-child,
+    .responsive-shrink-table td:first-child {
+        position: sticky;
+        background-color: #fff;
+        z-index: 10;
+    }
+
+    thead th {
+        top: 0;
+    }
+
+    .responsive-shrink-table th:first-child,
+    .responsive-shrink-table td:first-child {
+        left: 0;
+        text-align: left;
+        padding-left: 1rem;
+        box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
+        z-index: 5;
+    }
+
+    /* Row Hover Effects */
+    .responsive-shrink-table tbody tr:hover {
+        background-color: #f1f1f1;
+    }
+
+    .responsive-shrink-table tbody tr:hover td:first-child {
+        background-color: #f8f9fa;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: #e6f7ff;
+    }
+
+    /* Chart Sizing */
+    .scroll-wrapper canvas {
+        min-width: 400px;
+        width: 100%;
+    }
+
+    /* Container for table overflow */
+    .table-container {
+        max-height: 500px;
+        overflow: auto;
+    }
+</style>    
+
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container-fluid d-flex justify-content-between">
+        <a href="{% url 'dashboards:siso_dashboard' %}">
+            <img src="{% static 'edutrack logo official.png' %}" alt="Edutrack360 Logo" class="logo-img">
+        </a>
+    </div>
+</nav>
+<div class="container py-5">
+
+    <!-- 🔍 Filters -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <h3 class="card-title mb-4 text-secondary">Circuit Performance Analysis</h3>
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label fw-semibold">Academic Year</label>
+                    <select name="academic_year" class="form-select">
+                        {% for year in academic_years %}
+                            <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-semibold">Term</label>
+                    <select name="term" class="form-select">
+                        {% for term in terms %}
+                            <option value="{{ term }}" {% if term == selected_term %}selected{% endif %}>{{ term }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-primary w-100">
+                        <i class="bi bi-filter"></i> Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 📊 Department Performance Tables and Charts -->
+    {% for school, school_data in school_departments.items %}
+        <div class="card shadow-sm border-0 mb-5">
+            <div class="card-body">
+                <h4 class="card-title text-black">{{ school }}</h4>
+
+                {% for dept, dept_data in school_data.items %}
+                    <div class="card shadow-sm border-0 mb-5">
+                        <div class="card-body">
+                            <h5 class="card-title text-secondary">{{ dept }}</h5>
+
+                            {% with all_classes=dept_data.all_classes %}
+                            <div class="scroll-wrapper">
+                                <table class="table table-bordered table-hover text-center mt-3 responsive-shrink-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Subject</th>
+                                            {% for class_name in all_classes %}
+                                                <th>{{ class_name }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for subject, class_data in dept_data.subjects.items %}
+                                            <tr>
+                                                <td class="fw-semibold text-start">{{ subject }}</td>
+                                                {% for class_name in all_classes %}
+                                                    <td>{{ class_data|get_item:class_name|default:"-" }}</td>
+                                                {% endfor %}
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endwith %}
+
+                            <!-- 📊 Clustered Bar Chart -->
+                            <div class="scroll-wrapper">
+                                <canvas id="barChart_{{ dept|slugify }}" height="120"></canvas>
+                            </div>
+                            {% with dept_slug=dept|slugify %}
+                                {% with bar_data_id="bar-data-"|add:dept_slug %}
+                                    {{ dept_data.subjects|json_script:bar_data_id }}
+                                {% endwith %}
+                                {% with bar_classes_id="bar-classes-"|add:dept_slug %}
+                                    {{ dept_data.all_classes|json_script:bar_classes_id }}
+                                {% endwith %}
+                            {% endwith %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+
+    <!-- 📈 Per-School Term Performance with Circuit Average Row -->
+    <div class="card shadow-sm border-0 mb-5">
+        <div class="card-body">
+            <h5 class="card-title text-secondary">Per-School Term Performance</h5>
+            <div class="scroll-wrapper">
+                <table class="table table-bordered table-hover text-center mt-3 responsive-shrink-table">
+                    <thead class="table-light">
+                        <tr>
+                            {% for key in school_term_trends.0.keys %}
+                                <th>{{ key }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in school_term_trends %}
+                        <tr>
+                            {% for val in row.values %}
+                                <td>{{ val }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                        <tr class="fw-bold text-primary">
+                            {% for val in term_trend.values %}
+                                <td>{{ val }}</td>
+                            {% endfor %}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="scroll-wrapper">
+                <canvas id="termTrendChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📆 Academic Year Trend (Schools + Circuit) -->
+    <div class="card shadow-sm border-0 mb-5">
+        <div class="card-body">
+            <h5 class="card-title text-secondary">Academic Year Trend</h5>
+            <div class="scroll-wrapper">
+                <canvas id="yearTrendChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- JSON Script for Term and Year Charts -->
+    {{ term_chart|json_script:"term-chart-data" }}
+    {{ year_chart|json_script:"year-chart-data" }}
+
+    <div class="shadow-sm border rounded px-4 py-3 mt-4">
+        <a href="{% url 'siso:download_circuit_performance_pdf' %}?academic_year={{ selected_year }}&term={{ selected_term }}"
+            class="btn btn-outline-primary w-100">
+            ⬇️ Download PDF Report
+        </a>
+    </div>
+</div>
